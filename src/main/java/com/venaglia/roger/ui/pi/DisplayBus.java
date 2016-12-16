@@ -150,12 +150,16 @@ public class DisplayBus {
     }
 
     public static void main(String[] args) throws InterruptedException {
-        Injector injector = Guice.createInjector(new RogerModule());
-        ButtonSetLoader buttonSetLoader = injector.getInstance(ButtonSetLoader.class);
-        ButtonFace face = buttonSetLoader.get().get("Feel").getButtonFace();
-        DisplayBus displayBus = injector.getInstance(DisplayBus.class);
-        displayBus.sendCommand(DisplayNumber.DISPLAY0, face.getButtonUpdateCommands());
-        Thread.sleep(5000L);
-        System.exit(0);
+        try {
+            Injector injector = Guice.createInjector(new RogerModule());
+            ButtonSetLoader buttonSetLoader = injector.getInstance(ButtonSetLoader.class);
+            ButtonFace face = buttonSetLoader.get().get("Feel").getButtonFace();
+            DisplayBus displayBus = injector.getInstance(DisplayBus.class);
+            displayBus.sendCommand(DisplayNumber.DISPLAY0, face.getButtonUpdateCommands());
+            Thread.sleep(5000L);
+            System.exit(0);
+        } catch (Throwable t) {
+            t.printStackTrace();
+        }
     }
 }
