@@ -62,9 +62,6 @@ public class ButtonScanner {
                 gpioController.provisionDigitalMultipurposePin(COLUMN1, "col1", DIGITAL_INPUT, PULL_UP),
                 gpioController.provisionDigitalMultipurposePin(COLUMN2, "col2", DIGITAL_INPUT, PULL_UP)
         };
-        columnPins[0].setState(PinState.LOW);
-        columnPins[1].setState(PinState.LOW);
-        columnPins[2].setState(PinState.LOW);
         rowPins = new GpioPinDigitalInput[]{
                 gpioController.provisionDigitalInputPin(ROW0, "row0", PULL_UP),
                 gpioController.provisionDigitalInputPin(ROW1, "row1", PULL_UP),
@@ -78,18 +75,21 @@ public class ButtonScanner {
         columnPins[1].setMode(DIGITAL_INPUT);
         columnPins[2].setMode(DIGITAL_INPUT);
         columnPins[0].setMode(DIGITAL_OUTPUT);
+        columnPins[0].setState(PinState.LOW);
         if (rowPins[0].getState() == PinState.LOW) bitsA |= 0b0001;
         if (rowPins[1].getState() == PinState.LOW) bitsA |= 0b0010;
         if (rowPins[2].getState() == PinState.LOW) bitsA |= 0b0100;
         if (rowPins[3].getState() == PinState.LOW) bitsA |= 0b1000;
         columnPins[0].setMode(DIGITAL_INPUT);
         columnPins[1].setMode(DIGITAL_OUTPUT);
+        columnPins[1].setState(PinState.LOW);
         if (rowPins[0].getState() == PinState.LOW) bitsB |= 0b0001;
         if (rowPins[1].getState() == PinState.LOW) bitsB |= 0b0010;
         if (rowPins[2].getState() == PinState.LOW) bitsB |= 0b0100;
         if (rowPins[3].getState() == PinState.LOW) bitsB |= 0b1000;
         columnPins[1].setMode(DIGITAL_INPUT);
         columnPins[2].setMode(DIGITAL_OUTPUT);
+        columnPins[2].setState(PinState.LOW);
         if (rowPins[0].getState() == PinState.LOW) bitsC |= 0b0001;
         if (rowPins[1].getState() == PinState.LOW) bitsC |= 0b0010;
         if (rowPins[2].getState() == PinState.LOW) bitsC |= 0b0100;
