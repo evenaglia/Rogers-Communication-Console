@@ -22,6 +22,7 @@ import static com.pi4j.io.gpio.PinMode.DIGITAL_OUTPUT;
 import static com.pi4j.io.gpio.PinPullResistance.PULL_UP;
 import static com.venaglia.roger.ui.pi.PinAssignments.Buttons.*;
 
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.pi4j.io.gpio.GpioController;
 import com.pi4j.io.gpio.GpioPinDigitalInput;
@@ -54,6 +55,7 @@ public class ButtonScanner {
     private final GpioPinDigitalMultipurpose columnPins[];
     private final GpioPinDigitalInput rowPins[];
 
+    @Inject
     public ButtonScanner(GpioController gpioController) {
         columnPins = new GpioPinDigitalMultipurpose[]{
                 gpioController.provisionDigitalMultipurposePin(COLUMN0, "col0", DIGITAL_INPUT, PULL_UP),

@@ -30,7 +30,6 @@ import com.pi4j.io.spi.SpiFactory;
 import com.venaglia.roger.RogerModule;
 import com.venaglia.roger.buttons.ButtonFace;
 import com.venaglia.roger.buttons.ButtonSetLoader;
-import com.venaglia.roger.console.Updater;
 
 import java.io.IOException;
 import java.util.concurrent.ArrayBlockingQueue;
