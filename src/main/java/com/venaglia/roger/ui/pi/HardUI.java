@@ -19,8 +19,6 @@ package com.venaglia.roger.ui.pi;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import com.pi4j.io.gpio.GpioController;
-import com.pi4j.io.gpio.impl.GpioControllerImpl;
 import com.venaglia.roger.buttons.Button;
 import com.venaglia.roger.buttons.SimpleButtonListener;
 import com.venaglia.roger.output.OutputWindow;
@@ -28,6 +26,11 @@ import com.venaglia.roger.ui.ButtonListener;
 import com.venaglia.roger.ui.ButtonProcessor;
 import com.venaglia.roger.ui.UI;
 
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+import javax.swing.WindowConstants;
+import java.awt.Color;
+import java.awt.Cursor;
 import java.util.Arrays;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -61,6 +64,18 @@ public class HardUI implements UI {
         executor.scheduleAtFixedRate(this::pollButtons, 250, 50, TimeUnit.MILLISECONDS);
         Arrays.fill(buttons, Button.NIL);
         Arrays.fill(hardButtons, Button.NIL);
+        createOutputFrame((JPanel)outputWindow);
+    }
+
+    private void createOutputFrame(JPanel outputWindow) {
+        JFrame frame = new JFrame();
+        frame.setTitle("Output");
+        frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        frame.setBackground(Color.BLACK);
+        frame.add(outputWindow);
+        frame.setSize(outputWindow.getSize());
+        frame.getContentPane().setCursor(Cursor.getDefaultCursor());
+        frame.setVisible(true);
     }
 
     @Override
@@ -76,8 +91,8 @@ public class HardUI implements UI {
 
     private void setButtonImpl(Button b, Button[] dest, int idx) {
         assert b != null;
-        if (!buttons[idx].getId().equals(b.getId())) {
-            buttons[idx] = b;
+        if (!dest[idx].getId().equals(b.getId())) {
+            dest[idx] = b;
             displayBus.sendCommand(DisplayBus.DisplayNumber.values()[idx], b.getButtonFace().getButtonUpdateCommands());
         }
     }
