@@ -68,7 +68,7 @@ public class DisplayBus {
     public DisplayBus(GpioController gpioController) throws IOException {
         displayBus = SpiFactory.getInstance(SpiChannel.CS0, 8000000);
         displaySelector = SpiFactory.getInstance(SpiChannel.CS1, 8000000);
-        SoftPwm.softPwmCreate(PinAssignments.Displays.BACKLIGHT.getAddress(), 0, 64);
+        SoftPwm.softPwmCreate(PinAssignments.Displays.BACKLIGHT.getAddress(), 8, 64);
         queue = new ArrayBlockingQueue<>(256, true);
         Thread spiWriterThread = new Thread(this::writeLoop, "Display Bus Writer");
         spiWriterThread.setDaemon(true);
@@ -109,8 +109,12 @@ public class DisplayBus {
         while (true) {
             try {
                 command = command == null ? queue.take() : command;
-                if (command.displayNumber == null && command.data == null) {
-                    SoftPwm.softPwmWrite(PinAssignments.Displays.BACKLIGHT.getAddress(), command.ledValue);
+                if (command.displayNumber == null || command.data == null) {
+                    if (command.ledValue >= 0 && command.ledValue <= 64) {
+                        SoftPwm.softPwmWrite(PinAssignments.Displays.BACKLIGHT.getAddress(), command.ledValue);
+                    }
+                    command = null;
+                    continue;
                 }
                 if (displaySelector != null) {
                     displaySelector.write(command.displayNumber.selector);
