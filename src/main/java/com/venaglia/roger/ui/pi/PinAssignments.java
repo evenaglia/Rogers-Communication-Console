@@ -25,25 +25,23 @@ import com.pi4j.io.gpio.Pin;
  */
 public interface PinAssignments {
 
-    Pin BACKLIGHT = PiFacePin.GPIO_01;
-
     interface Buttons {
-        Pin COLUMN0 = PiFacePin.GPIO_02; // todo
-        Pin COLUMN1 = PiFacePin.GPIO_03; // todo
-        Pin COLUMN2 = PiFacePin.GPIO_04; // todo
-        Pin ROW0 = PiFacePin.GPIO_05; // todo
-        Pin ROW1 = PiFacePin.GPIO_06; // todo
-        Pin ROW2 = PiFacePin.GPIO_07; // todo
-        Pin ROW3 = PiFacePin.GPIO_08; // todo
+        Pin COLUMN0 = PiFacePin.GPIO_12;
+        Pin COLUMN1 = PiFacePin.GPIO_16;
+        Pin COLUMN2 = PiFacePin.GPIO_20;
+        Pin ROW1    = PiFacePin.GPIO_05;
+        Pin ROW2    = PiFacePin.GPIO_06;
+        Pin ROW3    = PiFacePin.GPIO_13;
+        Pin ROW4    = PiFacePin.GPIO_19;
     }
 
     interface Displays {
-        Pin CS0  = PiFacePin.GPIO_08;
-        Pin CS1  = PiFacePin.GPIO_07;
-        Pin MOSI = PiFacePin.GPIO_10;
-        Pin MISO = PiFacePin.GPIO_09;
-        Pin CLK  = PiFacePin.GPIO_11;
-        Pin LEDK = PiFacePin.GPIO_00; // todo
+        Pin CS0       = PiFacePin.GPIO_08;
+        Pin CS1       = PiFacePin.GPIO_07;
+        Pin MOSI      = PiFacePin.GPIO_10;
+        Pin MISO      = PiFacePin.GPIO_09;
+        Pin CLK       = PiFacePin.GPIO_11;
+        Pin BACKLIGHT = PiFacePin.GPIO_18;
     }
 
 }

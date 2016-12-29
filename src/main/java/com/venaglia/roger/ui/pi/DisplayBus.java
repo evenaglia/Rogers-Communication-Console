@@ -27,6 +27,7 @@ import com.pi4j.io.gpio.GpioController;
 import com.pi4j.io.spi.SpiChannel;
 import com.pi4j.io.spi.SpiDevice;
 import com.pi4j.io.spi.SpiFactory;
+import com.pi4j.wiringpi.SoftPwm;
 import com.venaglia.roger.RogerModule;
 import com.venaglia.roger.buttons.ButtonFace;
 import com.venaglia.roger.buttons.ButtonSetLoader;
@@ -42,19 +43,19 @@ import java.util.concurrent.BlockingQueue;
 public class DisplayBus {
 
     public enum DisplayNumber {
-        DISPLAY0(0b00000001),
-        DISPLAY1(0b00000010),
-        DISPLAY2(0b00000100),
-        DISPLAY3(0b00001000),
-        DISPLAY4(0b00010000),
-        DISPLAY5(0b00100000),
-        DISPLAY6(0b01000000),
-        DISPLAY7(0b10000000);
+        DISPLAY7(0b00000001),
+        DISPLAY6(0b00000010),
+        DISPLAY5(0b00000100),
+        DISPLAY4(0b00001000),
+        DISPLAY3(0b00010000),
+        DISPLAY2(0b00100000),
+        DISPLAY1(0b01000000),
+        DISPLAY0(0b10000000);
 
         private final byte[] selector;
 
         DisplayNumber(int selector) {
-            this.selector = new byte[]{(byte)selector};
+            this.selector = new byte[]{ (byte)(selector | 0x80)};
         }
     }
 
@@ -62,21 +63,12 @@ public class DisplayBus {
     private final SpiDevice displaySelector;
     private final BlockingQueue<Command> queue;
 
-    private DisplayBus() throws IOException {
-        displayBus = SpiFactory.getInstance(SpiChannel.CS0, 8000000);
-        displaySelector = null;
-        queue = new ArrayBlockingQueue<>(256, true);
-        Thread spiWriterThread = new Thread(this::writeLoop, "Display Bus Writer");
-        spiWriterThread.setDaemon(true);
-        spiWriterThread.start();
-        reset();
-    }
-
     @SuppressWarnings("UnusedParameters")
     @Inject
     public DisplayBus(GpioController gpioController) throws IOException {
         displayBus = SpiFactory.getInstance(SpiChannel.CS0, 8000000);
         displaySelector = SpiFactory.getInstance(SpiChannel.CS1, 8000000);
+        SoftPwm.softPwmCreate(PinAssignments.Displays.BACKLIGHT.getAddress(), 0, 64);
         queue = new ArrayBlockingQueue<>(256, true);
         Thread spiWriterThread = new Thread(this::writeLoop, "Display Bus Writer");
         spiWriterThread.setDaemon(true);
@@ -104,6 +96,12 @@ public class DisplayBus {
         }
     }
 
+    public void setBacklight(float value) {
+        if (!queue.offer(new Command(value))) {
+            throw new RuntimeException("Unable to enqueue command(s): Queue is full");
+        }
+    }
+
     @SuppressWarnings("InfiniteLoopStatement")
     private void writeLoop() {
         long[] waitUntil = new long[DisplayNumber.values().length];
@@ -111,6 +109,9 @@ public class DisplayBus {
         while (true) {
             try {
                 command = command == null ? queue.take() : command;
+                if (command.displayNumber == null && command.data == null) {
+                    SoftPwm.softPwmWrite(PinAssignments.Displays.BACKLIGHT.getAddress(), command.ledValue);
+                }
                 if (displaySelector != null) {
                     displaySelector.write(command.displayNumber.selector);
                 }
@@ -139,12 +140,20 @@ public class DisplayBus {
     private static class Command {
         final DisplayNumber displayNumber;
         final byte[][] data;
+        final int ledValue;
 
         private Command(DisplayNumber displayNumber, byte[][] data) {
             assert displayNumber != null;
             assert data != null && data.length > 0;
             this.displayNumber = displayNumber;
             this.data = data;
+            this.ledValue = -1;
+        }
+
+        private Command(float led) {
+            this.displayNumber = null;
+            this.data = null;
+            this.ledValue = Math.round(Math.max(0.0f, Math.min(1.0f, led)) * 64);
         }
     }
 

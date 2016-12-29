@@ -63,10 +63,10 @@ public class ButtonScanner {
                 gpioController.provisionDigitalMultipurposePin(COLUMN2, "col2", DIGITAL_INPUT, PULL_UP)
         };
         rowPins = new GpioPinDigitalInput[]{
-                gpioController.provisionDigitalInputPin(ROW0, "row0", PULL_UP),
-                gpioController.provisionDigitalInputPin(ROW1, "row1", PULL_UP),
-                gpioController.provisionDigitalInputPin(ROW2, "row2", PULL_UP),
-                gpioController.provisionDigitalInputPin(ROW3, "row3", PULL_UP)
+                gpioController.provisionDigitalInputPin(ROW1, "row0", PULL_UP),
+                gpioController.provisionDigitalInputPin(ROW2, "row1", PULL_UP),
+                gpioController.provisionDigitalInputPin(ROW3, "row2", PULL_UP),
+                gpioController.provisionDigitalInputPin(ROW4, "row3", PULL_UP)
         };
     }
 
