@@ -19,20 +19,23 @@ package com.venaglia.roger.ui.pi;
 
 import static java.lang.System.currentTimeMillis;
 
-import com.google.inject.Guice;
 import com.google.inject.Inject;
-import com.google.inject.Injector;
 import com.google.inject.Singleton;
 import com.pi4j.io.gpio.GpioController;
+import com.pi4j.io.gpio.GpioFactory;
 import com.pi4j.io.spi.SpiChannel;
 import com.pi4j.io.spi.SpiDevice;
 import com.pi4j.io.spi.SpiFactory;
 import com.pi4j.wiringpi.SoftPwm;
-import com.venaglia.roger.RogerModule;
 import com.venaglia.roger.buttons.ButtonFace;
-import com.venaglia.roger.buttons.ButtonSetLoader;
 
+import javax.imageio.ImageIO;
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.Base64;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
@@ -161,13 +164,54 @@ public class DisplayBus {
         }
     }
 
+    private static byte[][] getColorBars() {
+        byte[] png = Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAKAAAACACAMAAAC7vZIpAAABO1BMVEUCAgIKAAIE" +
+                                                "BAQFBQUGBgYRCB0PChAQDAsPCxkPCxwRDBAKDwkKDhcPDgkLDhUPDgoODg4LDw4R" +
+                                                "DgcODhAKDxINDw4NEAcKEBAPDw8IEgoMEQ1JAQIfDhRPAgoSExcMFhUUFBQTFRQM" +
+                                                "GAwhEwADA/8DBP4WFhYBBf4AHyUbGwBoAR8AIx5GBX0fIAAAJy0WG6pfAORgAOdl" +
+                                                "AOFhAedkAeVnAPlQE4oAOgALKaEKK5ILLpYOLpH/AQnxBgL9AwQuQkv4Af//AP//" +
+                                                "Af/8A/35BP/6BP32BvvzB//2B/jkFNzaGNnfFuB3SLyAQ9+AROJdo/hdpflTxUut" +
+                                                "qvsD/AAB+vwF+v0C+/8C/PoC/PsA/fsA//QQ/9ns6u///A39/gP9/wT/6+r/6+3/" +
+                                                "8Pz49/X89vj/9vb/+fn7+v/7/fph/+z1AAAAAWJLR0QAiAUdSAAAAAlwSFlzAAAL" +
+                                                "EwAACxMBAJqcGAAAAAd0SU1FB+AMHQgbAW0xedUAAAAmaVRYdENvbW1lbnQAAAAA" +
+                                                "AENyZWF0ZWQgd2l0aCBHSU1QIG9uIGEgTWFjleRfWwAAAUZJREFUeNrt0tVOA0EA" +
+                                                "heHBHZbF3aW4w+LuDsVbHPr+T0CyW7INnAmEpFz9//XJzJfJmEdd7F4Vvz5X3Z7J" +
+                                                "TtZUGwuLqvkunQEIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQI" +
+                                                "ECBAgAABAgQIECBAgAABAgQIECDA/wQO6wYjqo6DQ9X+tGzpWHXU16RqONWZHl1l" +
+                                                "taplRT7Kbo2sN6q6Ka9TFd7pjOVlSx1V86oE7six0y//w2W+HFdZ/hpAgAABphvY" +
+                                                "qStxXbfi2ynty+t+W5vbqe0Vh5WF66EL1VWOBj7ozJxuxvO855evPb0m/AbGJlKb" +
+                                                "HAkrCO9szFPlZmQHJVe1rX5t9Tozay/xZmtqdNxWkfNTmck+gd1BljVAgAABAgQI" +
+                                                "ECBAgAABAgQIECBAgH8CvqcHaAJf1u+AH2W5R6gIl+R/AAAAAElFTkSuQmCC");
+        BufferedImage bufferedImage;
+        try {
+            bufferedImage = ImageIO.read(new ByteArrayInputStream(png));
+        } catch (IOException e) {
+            throw new RuntimeException(e.getMessage(), e);
+        }
+        Graphics2D g = (Graphics2D)bufferedImage.getGraphics();
+        g.setColor(Color.BLACK);
+        g.fillRect(0, 0, 160, 128);
+
+        int i = 0;
+        byte[] buf = new byte[61441];
+        buf[i++] = (byte)0x2C; // RAMWR
+        for (int argb : bufferedImage.getRGB(0, 0, 160, 128, null, 0, 160)) {
+            buf[i++] = (byte)((argb >> 16) & 0xFF);
+            buf[i++] = (byte)((argb >> 8) & 0xFF);
+            buf[i++] = (byte)(argb & 0xFF);
+        }
+        return new byte[][]{
+                new byte[]{0x2A, 0, 0, 0, (byte)159},
+                new byte[]{0x2B, 0, 0, 0, 127},
+                buf
+        };
+    }
+
     public static void main(String[] args) throws InterruptedException {
         try {
-            Injector injector = Guice.createInjector(new RogerModule());
-            ButtonSetLoader buttonSetLoader = injector.getInstance(ButtonSetLoader.class);
-            ButtonFace face = buttonSetLoader.get().get("Feel").getButtonFace();
-            DisplayBus displayBus = injector.getInstance(DisplayBus.class);
-            displayBus.sendCommand(DisplayNumber.DISPLAY0, face.getButtonUpdateCommands());
+            DisplayBus displayBus = new DisplayBus(GpioFactory.getInstance());
+            displayBus.sendCommand(DisplayNumber.DISPLAY0, ButtonFace.getInitCommands());
+            displayBus.sendCommand(DisplayNumber.DISPLAY0, getColorBars());
             Thread.sleep(5000L);
             System.exit(0);
         } catch (Throwable t) {
