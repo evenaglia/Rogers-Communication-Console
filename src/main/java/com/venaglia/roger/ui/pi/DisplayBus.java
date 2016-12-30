@@ -69,13 +69,20 @@ public class DisplayBus {
     private final SpiDevice displaySelector;
     private final GpioPinPwmOutput backlight;
     private final BlockingQueue<Command> queue;
+    private final Runnable writeLoop = new Runnable() {
+        @Override
+        public void run() {
+            DisplayBus.this.writeLoop();
+        }
+    };
+
 
     @SuppressWarnings("UnusedParameters")
     @Inject
     public DisplayBus(GpioController gpioController) throws IOException {
-        if (Gpio.wiringPiSetup() != 0) {
-            throw new IOException("GPIO setup was unsuccessful!");
-        }
+//        if (Gpio.wiringPiSetup() != 0) {
+//            throw new IOException("GPIO setup was unsuccessful!");
+//        }
         displayBus = SpiFactory.getInstance(SpiChannel.CS0, SpiDevice.DEFAULT_SPI_SPEED, SpiDevice.DEFAULT_SPI_MODE);
         displaySelector = SpiFactory.getInstance(SpiChannel.CS1, SpiDevice.DEFAULT_SPI_SPEED, SpiDevice.DEFAULT_SPI_MODE);
         Gpio.pinMode(PinAssignments.Displays.RESET.getAddress(), Gpio.OUTPUT);
@@ -86,7 +93,7 @@ public class DisplayBus {
         Gpio.pwmSetClock(100);
         Gpio.pwmWrite(PinAssignments.Displays.BACKLIGHT.getAddress(), 32);
         queue = new ArrayBlockingQueue<>(256, true);
-        Thread spiWriterThread = new Thread(this::writeLoop, "Display Bus Writer");
+        Thread spiWriterThread = new Thread(writeLoop, "Display Bus Writer");
         spiWriterThread.setDaemon(true);
         spiWriterThread.start();
         reset(true);

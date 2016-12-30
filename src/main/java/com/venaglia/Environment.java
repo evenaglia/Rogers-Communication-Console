@@ -33,7 +33,7 @@ public enum Environment {
         boolean pi4jPresent = false;
         try {
             Class.forName("com.pi4j.io.gpio.GpioFactory");
-            pi4jPresent = false;
+            pi4jPresent = true;
         } catch (ClassNotFoundException e) {
             // the lib isn't present
         }
@@ -52,6 +52,8 @@ public enum Environment {
         }
         if (CURRENT_ENVIRONMENT == DEVELOPMENT) {
             System.out.println("INFO - Running in DEVELOPMENT mode");
+        } else {
+            System.out.println("INFO - Running in PRODUCTION mode");
         }
     }
 

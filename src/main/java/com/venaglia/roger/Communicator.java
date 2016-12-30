@@ -36,9 +36,7 @@ public class Communicator {
             ui.addListener(updater.getButtonListener());
             ui.addListener(injector.getInstance(UserInputHandler.class));
         } catch (Exception e) {
-            for (StackTraceElement ste : e.getStackTrace()) {
-                System.out.println(ste);
-            }
+            e.printStackTrace();
         }
     }
 
