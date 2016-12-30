@@ -23,6 +23,7 @@ import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.pi4j.io.gpio.GpioController;
 import com.pi4j.io.gpio.GpioFactory;
+import com.pi4j.io.gpio.GpioPinPwmOutput;
 import com.pi4j.io.spi.SpiChannel;
 import com.pi4j.io.spi.SpiDevice;
 import com.pi4j.io.spi.SpiFactory;
@@ -62,8 +63,11 @@ public class DisplayBus {
         }
     }
 
+    private static final int PWM_RANGE = 1000;
+
     private final SpiDevice displayBus;
     private final SpiDevice displaySelector;
+    private final GpioPinPwmOutput backlight;
     private final BlockingQueue<Command> queue;
 
     @SuppressWarnings("UnusedParameters")
@@ -76,7 +80,10 @@ public class DisplayBus {
         displaySelector = SpiFactory.getInstance(SpiChannel.CS1, SpiDevice.DEFAULT_SPI_SPEED, SpiMode.MODE_0);
         Gpio.pinMode(PinAssignments.Displays.RESET.getAddress(), Gpio.OUTPUT);
         Gpio.digitalWrite(PinAssignments.Displays.RESET.getAddress(), Gpio.LOW);
-        Gpio.pinMode(PinAssignments.Displays.BACKLIGHT.getAddress(), Gpio.PWM_MODE_MS);
+        backlight = gpioController.provisionPwmOutputPin(PinAssignments.Displays.BACKLIGHT);
+        Gpio.pwmSetMode(Gpio.PWM_MODE_MS);
+        Gpio.pwmSetRange(PWM_RANGE);
+        Gpio.pwmSetClock(500);
         Gpio.pwmWrite(PinAssignments.Displays.BACKLIGHT.getAddress(), 32);
         queue = new ArrayBlockingQueue<>(256, true);
         Thread spiWriterThread = new Thread(this::writeLoop, "Display Bus Writer");
@@ -132,8 +139,8 @@ public class DisplayBus {
                     Gpio.digitalWrite(PinAssignments.Displays.RESET.getAddress(), Gpio.HIGH);
                     sleepUntil(currentTimeMillis() + 200L);
                 }
-                if (command.ledValue >= 0 && command.ledValue <= 64) {
-                    Gpio.pwmWrite(PinAssignments.Displays.BACKLIGHT.getAddress(), command.ledValue);
+                if (command.ledValue >= 0 && command.ledValue <= PWM_RANGE) {
+                    backlight.setPwm(command.ledValue);
                     until = currentTimeMillis() + 125L;
                 }
                 if (command.data != null) {
@@ -187,7 +194,7 @@ public class DisplayBus {
             this.displayNumber = DisplayNumber.ALL;
             this.data = null;
             this.extraWaitTime = 0L;
-            this.ledValue = Math.round(Math.max(0.0f, Math.min(1.0f, ledValue)) * 1024);
+            this.ledValue = Math.round(Math.max(0.0f, Math.min(1.0f, ledValue)) * PWM_RANGE);
             this.reset500ms = false;
         }
 
