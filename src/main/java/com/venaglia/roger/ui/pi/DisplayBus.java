@@ -77,7 +77,7 @@ public class DisplayBus {
         Gpio.pinMode(PinAssignments.Displays.RESET.getAddress(), Gpio.OUTPUT);
         Gpio.digitalWrite(PinAssignments.Displays.RESET.getAddress(), Gpio.LOW);
         Gpio.pinMode(PinAssignments.Displays.BACKLIGHT.getAddress(), Gpio.PWM_MODE_MS);
-        Gpio.pwmSetClock(32);
+        Gpio.pwmWrite(PinAssignments.Displays.BACKLIGHT.getAddress(), 32);
         queue = new ArrayBlockingQueue<>(256, true);
         Thread spiWriterThread = new Thread(this::writeLoop, "Display Bus Writer");
         spiWriterThread.setDaemon(true);
@@ -133,7 +133,7 @@ public class DisplayBus {
                     sleepUntil(currentTimeMillis() + 200L);
                 }
                 if (command.ledValue >= 0 && command.ledValue <= 64) {
-                    Gpio.pwmSetClock(command.ledValue);
+                    Gpio.pwmWrite(PinAssignments.Displays.BACKLIGHT.getAddress(), command.ledValue);
                     until = currentTimeMillis() + 125L;
                 }
                 if (command.data != null) {
