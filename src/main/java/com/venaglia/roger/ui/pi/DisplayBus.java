@@ -23,11 +23,12 @@ import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.pi4j.io.gpio.GpioController;
 import com.pi4j.io.gpio.GpioFactory;
+import com.pi4j.io.gpio.GpioPinDigitalOutput;
 import com.pi4j.io.gpio.GpioPinPwmOutput;
+import com.pi4j.io.gpio.PinState;
 import com.pi4j.io.spi.SpiChannel;
 import com.pi4j.io.spi.SpiDevice;
 import com.pi4j.io.spi.SpiFactory;
-import com.pi4j.io.spi.SpiMode;
 import com.pi4j.wiringpi.Gpio;
 import com.venaglia.roger.buttons.ButtonFace;
 
@@ -67,6 +68,7 @@ public class DisplayBus {
 
     private final SpiDevice displayBus;
     private final SpiDevice displaySelector;
+    private final GpioPinDigitalOutput reset;
     private final GpioPinPwmOutput backlight;
     private final BlockingQueue<Command> queue;
     private final Runnable writeLoop = new Runnable() {
@@ -87,6 +89,8 @@ public class DisplayBus {
         displaySelector = SpiFactory.getInstance(SpiChannel.CS1, SpiDevice.DEFAULT_SPI_SPEED, SpiDevice.DEFAULT_SPI_MODE);
         Gpio.pinMode(PinAssignments.Displays.RESET.getAddress(), Gpio.OUTPUT);
         Gpio.digitalWrite(PinAssignments.Displays.RESET.getAddress(), Gpio.LOW);
+        reset = gpioController.provisionDigitalOutputPin(PinAssignments.Displays.RESET, PinState.HIGH);
+        reset.setShutdownOptions(false, PinState.LOW);
         backlight = gpioController.provisionPwmOutputPin(PinAssignments.Displays.BACKLIGHT);
         Gpio.pwmSetMode(Gpio.PWM_MODE_MS);
         Gpio.pwmSetRange(PWM_RANGE);
@@ -141,10 +145,8 @@ public class DisplayBus {
                 until = 0;
                 if (command.reset500ms) {
                     displaySelector.write(command.displayNumber.selector);
-                    Gpio.digitalWrite(PinAssignments.Displays.RESET.getAddress(), Gpio.LOW);
-                    sleepUntil(currentTimeMillis() + 300L);
-                    Gpio.digitalWrite(PinAssignments.Displays.RESET.getAddress(), Gpio.HIGH);
-                    sleepUntil(currentTimeMillis() + 200L);
+                    reset.pulse(300, PinState.LOW, false);
+                    sleepUntil(currentTimeMillis() + 500L);
                 }
                 if (command.ledValue >= 0 && command.ledValue <= PWM_RANGE) {
                     backlight.setPwm(command.ledValue);
