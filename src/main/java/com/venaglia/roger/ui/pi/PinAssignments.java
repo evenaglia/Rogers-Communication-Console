@@ -17,8 +17,8 @@
 
 package com.venaglia.roger.ui.pi;
 
-import com.pi4j.io.gpio.PiFacePin;
 import com.pi4j.io.gpio.Pin;
+import com.pi4j.io.gpio.RaspiPin;
 
 /**
  * Created by ed on 12/7/16.
@@ -26,23 +26,23 @@ import com.pi4j.io.gpio.Pin;
 public interface PinAssignments {
 
     interface Buttons {
-        Pin COLUMN0 = PiFacePin.GPIO_12;
-        Pin COLUMN1 = PiFacePin.GPIO_16;
-        Pin COLUMN2 = PiFacePin.GPIO_20;
-        Pin ROW1    = PiFacePin.GPIO_05;
-        Pin ROW2    = PiFacePin.GPIO_06;
-        Pin ROW3    = PiFacePin.GPIO_13;
-        Pin ROW4    = PiFacePin.GPIO_19;
+        Pin COLUMN0 = RaspiPin.GPIO_26;
+        Pin COLUMN1 = RaspiPin.GPIO_27;
+        Pin COLUMN2 = RaspiPin.GPIO_28;
+        Pin ROW1    = RaspiPin.GPIO_21;
+        Pin ROW2    = RaspiPin.GPIO_22;
+        Pin ROW3    = RaspiPin.GPIO_23;
+        Pin ROW4    = RaspiPin.GPIO_24;
     }
 
     interface Displays {
-        Pin CS0       = PiFacePin.GPIO_08;
-        Pin CS1       = PiFacePin.GPIO_07;
-        Pin MOSI      = PiFacePin.GPIO_10;
-        Pin MISO      = PiFacePin.GPIO_09;
-        Pin CLK       = PiFacePin.GPIO_11;
-        Pin RESET     = PiFacePin.GPIO_04;
-        Pin BACKLIGHT = PiFacePin.GPIO_18;
+        Pin CS0       = RaspiPin.GPIO_10;
+        Pin CS1       = RaspiPin.GPIO_11;
+        Pin MOSI      = RaspiPin.GPIO_12;
+        Pin MISO      = RaspiPin.GPIO_13;
+        Pin CLK       = RaspiPin.GPIO_14;
+        Pin RESET     = RaspiPin.GPIO_07;
+        Pin BACKLIGHT = RaspiPin.GPIO_01;
     }
 
 }

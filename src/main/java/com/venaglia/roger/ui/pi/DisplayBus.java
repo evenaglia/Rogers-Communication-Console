@@ -28,7 +28,6 @@ import com.pi4j.io.spi.SpiDevice;
 import com.pi4j.io.spi.SpiFactory;
 import com.pi4j.io.spi.SpiMode;
 import com.pi4j.wiringpi.Gpio;
-import com.pi4j.wiringpi.SoftPwm;
 import com.venaglia.roger.buttons.ButtonFace;
 
 import javax.imageio.ImageIO;
@@ -75,9 +74,10 @@ public class DisplayBus {
         }
         displayBus = SpiFactory.getInstance(SpiChannel.CS0, SpiDevice.DEFAULT_SPI_SPEED, SpiMode.MODE_0);
         displaySelector = SpiFactory.getInstance(SpiChannel.CS1, SpiDevice.DEFAULT_SPI_SPEED, SpiMode.MODE_0);
-        SoftPwm.softPwmCreate(PinAssignments.Displays.BACKLIGHT.getAddress(), 8, 64);
         Gpio.pinMode(PinAssignments.Displays.RESET.getAddress(), Gpio.OUTPUT);
         Gpio.digitalWrite(PinAssignments.Displays.RESET.getAddress(), Gpio.LOW);
+        Gpio.pinMode(PinAssignments.Displays.BACKLIGHT.getAddress(), Gpio.PWM_MODE_MS);
+        Gpio.pwmSetClock(32);
         queue = new ArrayBlockingQueue<>(256, true);
         Thread spiWriterThread = new Thread(this::writeLoop, "Display Bus Writer");
         spiWriterThread.setDaemon(true);
@@ -133,7 +133,7 @@ public class DisplayBus {
                     sleepUntil(currentTimeMillis() + 200L);
                 }
                 if (command.ledValue >= 0 && command.ledValue <= 64) {
-                    SoftPwm.softPwmWrite(PinAssignments.Displays.BACKLIGHT.getAddress(), command.ledValue);
+                    Gpio.pwmSetClock(command.ledValue);
                     until = currentTimeMillis() + 125L;
                 }
                 if (command.data != null) {
@@ -184,15 +184,15 @@ public class DisplayBus {
         }
 
         private Command(float ledValue) {
-            this.displayNumber = null;
+            this.displayNumber = DisplayNumber.ALL;
             this.data = null;
             this.extraWaitTime = 0L;
-            this.ledValue = Math.round(Math.max(0.0f, Math.min(1.0f, ledValue)) * 64);
+            this.ledValue = Math.round(Math.max(0.0f, Math.min(1.0f, ledValue)) * 1024);
             this.reset500ms = false;
         }
 
         private Command() {
-            this.displayNumber = null;
+            this.displayNumber = DisplayNumber.ALL;
             this.data = null;
             this.extraWaitTime = 0L;
             this.ledValue = -1;
