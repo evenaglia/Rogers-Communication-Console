@@ -76,14 +76,14 @@ public class DisplayBus {
         if (Gpio.wiringPiSetup() != 0) {
             throw new IOException("GPIO setup was unsuccessful!");
         }
-        displayBus = SpiFactory.getInstance(SpiChannel.CS0, SpiDevice.DEFAULT_SPI_SPEED, SpiMode.MODE_0);
-        displaySelector = SpiFactory.getInstance(SpiChannel.CS1, SpiDevice.DEFAULT_SPI_SPEED, SpiMode.MODE_0);
+        displayBus = SpiFactory.getInstance(SpiChannel.CS0, SpiDevice.DEFAULT_SPI_SPEED, SpiDevice.DEFAULT_SPI_MODE);
+        displaySelector = SpiFactory.getInstance(SpiChannel.CS1, SpiDevice.DEFAULT_SPI_SPEED, SpiDevice.DEFAULT_SPI_MODE);
         Gpio.pinMode(PinAssignments.Displays.RESET.getAddress(), Gpio.OUTPUT);
         Gpio.digitalWrite(PinAssignments.Displays.RESET.getAddress(), Gpio.LOW);
         backlight = gpioController.provisionPwmOutputPin(PinAssignments.Displays.BACKLIGHT);
         Gpio.pwmSetMode(Gpio.PWM_MODE_MS);
         Gpio.pwmSetRange(PWM_RANGE);
-        Gpio.pwmSetClock(500);
+        Gpio.pwmSetClock(100);
         Gpio.pwmWrite(PinAssignments.Displays.BACKLIGHT.getAddress(), 32);
         queue = new ArrayBlockingQueue<>(256, true);
         Thread spiWriterThread = new Thread(this::writeLoop, "Display Bus Writer");
@@ -226,6 +226,34 @@ public class DisplayBus {
                                                 "qStxXbfi2ynty+t+W5vbqe0Vh5WF66EL1VWOBj7ozJxuxvO855evPb0m/AbGJlKb" +
                                                 "HAkrCO9szFPlZmQHJVe1rX5t9Tozay/xZmtqdNxWkfNTmck+gd1BljVAgAABAgQI" +
                                                 "ECBAgAABAgQIECBAgH8CvqcHaAJf1u+AH2W5R6gIl+R/AAAAAElFTkSuQmCC");
+        return pngImageToCommandBytes(png);
+    }
+
+    private static byte[][] getCheckerboard() throws IOException {
+        @SuppressWarnings("SpellCheckingInspection")
+        byte[] png = Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAKAAAACACAQAAAAmaqqQAAAAAmJLR0QA/4ePzL8A" +
+                                                "AAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQfgDB4FLyceezNiAAAAJmlUWHRD" +
+                                                "b21tZW50AAAAAABDcmVhdGVkIHdpdGggR0lNUCBvbiBhIE1hY5XkX1sAAALeSURB" +
+                                                "VHja7Z2xbtRAFEXvjCeJEBLdgvgfaEIBEjV/RwUFVajo+Q4qlvwASmR7qBCd75U8" +
+                                                "WmXDuW2ejsdnnRnpjTUu6rIJSnTUS40hlaDmWjeDSHtHVEV2BYEIRCACEUgQiEAE" +
+                                                "IpAgEIEIRCBBIAIR+P+kfDIt2aKuzwHoqa5tzZU+mopZT/TO/uZFP/Td3Zh+64Op" +
+                                                "6Vr0xdZMer91ndX2tLuafM0L/TQ1i6RLy5FWU3Ovpq96a0lFi63purA/xLo5oub3" +
+                                                "DYrdN5i0qNodiEk92IHwnCt1TUN2V+aAc6m7TU4bMQ8sSjZnSrTJsw4Q8+9p3s5F" +
+                                                "QLljEWEVRiACCQIRiEAEEgQiEIEIJAhEIAIfT9pkClZNtrNbVHSUJynoEU+WU1T1" +
+                                                "ypKkakld3XJWzZuc5huYS/iYelKxpKSlX7WoR2NypCm6t8vtlv4pH/eka51pGTPz" +
+                                                "LEFN3fl3gkAEIhCBBIEIRCACCQIRiEAEEgQi8AHFNlRLYLlLei5PmgNSiRqzNwFp" +
+                                                "CkbUd7d426izVZJmaPJmc4+aqiUgrRrx/nfTfJpzY+oQxSPTh1Bm5kAWEQQikCAQ" +
+                                                "gQhEIEEgAhGIQIJABCLw8WRYQ/V20LHXvqFa1PU6IC2DWrzbfUwrsKtGF/H93x4I" +
+                                                "7MGpHVJVs6TkHJGuJRjR9k/axrTG0+e0BH/PnlJHaicaEXMgiwgCEYhAgkAEIhCB" +
+                                                "BIEIRCACCQIReEZpR1vS7Ucfi1YddLRVJSDNlrOq6VtAutcxEJB80HKL0w52IF23" +
+                                                "geQqT1JEOtiKSc8saZUCUg1GtG5ymv8fLtHZzhpyEEnKqcNIew9rGTYH9pPOPP3B" +
+                                                "XItFhFUYgQhEIEEgAhGIQIJABCIQgQSBCDyjDPmyoST9GvKSeQ8/3/cmICl62/oE" +
+                                                "L5n7DzoWe5m/t5SQMs4Y0rqb00a8iK3olnKSTkjay2EOZBFBIAIRSBCIQAQikCAQ" +
+                                                "gQhEIEEgAs8ofwCxCbD+Nzru2QAAAABJRU5ErkJggg==");
+        return pngImageToCommandBytes(png);
+    }
+
+    private static byte[][] pngImageToCommandBytes(byte[] png) throws IOException {
         BufferedImage bufferedImage;
         bufferedImage = ImageIO.read(new ByteArrayInputStream(png));
 
@@ -249,8 +277,12 @@ public class DisplayBus {
             DisplayBus displayBus = new DisplayBus(GpioFactory.getInstance());
             displayBus.sendCommand(DisplayNumber.ALL, ButtonFace.getInitCommands());
             Thread.sleep(1000L);
-            displayBus.sendCommand(DisplayNumber.DISPLAY0, getColorBars());
-            Thread.sleep(5000L);
+            for (int i = 0; i < 15; i++) {
+                displayBus.sendCommand(DisplayNumber.DISPLAY0, getColorBars());
+                Thread.sleep(1000L);
+                displayBus.sendCommand(DisplayNumber.DISPLAY0, getCheckerboard());
+                Thread.sleep(1000L);
+            }
             System.exit(0);
         } catch (Throwable t) {
             t.printStackTrace();
