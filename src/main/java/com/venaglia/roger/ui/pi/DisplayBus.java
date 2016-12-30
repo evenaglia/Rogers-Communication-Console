@@ -26,12 +26,12 @@ import com.pi4j.io.gpio.GpioFactory;
 import com.pi4j.io.spi.SpiChannel;
 import com.pi4j.io.spi.SpiDevice;
 import com.pi4j.io.spi.SpiFactory;
+import com.pi4j.io.spi.SpiMode;
+import com.pi4j.wiringpi.Gpio;
 import com.pi4j.wiringpi.SoftPwm;
 import com.venaglia.roger.buttons.ButtonFace;
 
 import javax.imageio.ImageIO;
-import java.awt.Color;
-import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -53,12 +53,13 @@ public class DisplayBus {
         DISPLAY3(0b00010000),
         DISPLAY2(0b00100000),
         DISPLAY1(0b01000000),
-        DISPLAY0(0b10000000);
+        DISPLAY0(0b10000000),
+        ALL     (0b11111111);
 
         private final byte[] selector;
 
         DisplayNumber(int selector) {
-            this.selector = new byte[]{ (byte)(selector | 0x80)};
+            this.selector = new byte[]{ (byte)(selector)};
         }
     }
 
@@ -69,38 +70,47 @@ public class DisplayBus {
     @SuppressWarnings("UnusedParameters")
     @Inject
     public DisplayBus(GpioController gpioController) throws IOException {
-        displayBus = SpiFactory.getInstance(SpiChannel.CS0, 8000000);
-        displaySelector = SpiFactory.getInstance(SpiChannel.CS1, 8000000);
+        if (Gpio.wiringPiSetup() != 0) {
+            throw new IOException("GPIO setup was unsuccessful!");
+        }
+        displayBus = SpiFactory.getInstance(SpiChannel.CS0, SpiDevice.DEFAULT_SPI_SPEED, SpiMode.MODE_0);
+        displaySelector = SpiFactory.getInstance(SpiChannel.CS1, SpiDevice.DEFAULT_SPI_SPEED, SpiMode.MODE_0);
         SoftPwm.softPwmCreate(PinAssignments.Displays.BACKLIGHT.getAddress(), 8, 64);
+        Gpio.pinMode(PinAssignments.Displays.RESET.getAddress(), Gpio.OUTPUT);
+        Gpio.digitalWrite(PinAssignments.Displays.RESET.getAddress(), Gpio.LOW);
         queue = new ArrayBlockingQueue<>(256, true);
         Thread spiWriterThread = new Thread(this::writeLoop, "Display Bus Writer");
         spiWriterThread.setDaemon(true);
         spiWriterThread.start();
-        reset();
+        reset(true);
     }
 
-    public void reset() {
-        for (DisplayNumber displayNumber : DisplayNumber.values()) {
-            sendCommand(displayNumber, new byte[]{ 0x01 }); // reset
-        }
-        for (DisplayNumber displayNumber : DisplayNumber.values()) {
-            sendCommand(displayNumber, new byte[]{ 0x02 }); // nop - adds some extra time after the reset
+    public void reset(boolean hard) {
+        if (hard) {
+            queueCommand(new Command());
+        } else {
+            queueCommand(new Command(DisplayNumber.ALL, new byte[][]{ new byte[]{ 0x01 } }, 150L));
         }
         for (byte[] bytes : ButtonFace.getInitCommands()) {
-            for (DisplayNumber displayNumber : DisplayNumber.values()) {
-                sendCommand(displayNumber, bytes);
-            }
+            queueCommand(new Command(DisplayNumber.ALL, new byte[][]{ bytes }));
         }
     }
 
     public void sendCommand(DisplayNumber displayNumber, byte[]... commands) {
-        if (!queue.offer(new Command(displayNumber, commands))) {
-            throw new RuntimeException("Unable to enqueue command(s): Queue is full");
-        }
+        queueCommand(new Command(displayNumber, commands));
+    }
+
+    public void sleep(DisplayNumber displayNumber, boolean sleep) {
+        byte[] data = new byte[]{ (byte)(sleep ? 0x10 : 0x11) };
+        queueCommand(new Command(displayNumber, new byte[][]{ data }, 125));
     }
 
     public void setBacklight(float value) {
-        if (!queue.offer(new Command(value))) {
+        queueCommand(new Command(value));
+    }
+
+    private void queueCommand(Command c) {
+        if (!queue.offer(c)) {
             throw new RuntimeException("Unable to enqueue command(s): Queue is full");
         }
     }
@@ -112,28 +122,30 @@ public class DisplayBus {
         while (true) {
             try {
                 command = command == null ? queue.take() : command;
-                if (command.displayNumber == null || command.data == null) {
-                    if (command.ledValue >= 0 && command.ledValue <= 64) {
-                        SoftPwm.softPwmWrite(PinAssignments.Displays.BACKLIGHT.getAddress(), command.ledValue);
-                    }
-                    command = null;
-                    continue;
-                }
-                if (displaySelector != null) {
-                    displaySelector.write(command.displayNumber.selector);
-                }
                 long until = waitUntil[command.displayNumber.ordinal()];
-                for (long now = currentTimeMillis(); now > until; now = currentTimeMillis()) {
-                    Thread.sleep(now - until);
+                sleepUntil(until);
+                until = 0;
+                if (command.reset500ms) {
+                    displaySelector.write(command.displayNumber.selector);
+                    Gpio.digitalWrite(PinAssignments.Displays.RESET.getAddress(), Gpio.LOW);
+                    sleepUntil(currentTimeMillis() + 300L);
+                    Gpio.digitalWrite(PinAssignments.Displays.RESET.getAddress(), Gpio.HIGH);
+                    sleepUntil(currentTimeMillis() + 200L);
                 }
-                double sendTime = 0.0;
-                for (byte[] data : command.data) {
-                    sendTime += data.length / 1000.0;
-                    if (command.displayNumber == DisplayNumber.DISPLAY0) {
-                        displayBus.write(data);
+                if (command.ledValue >= 0 && command.ledValue <= 64) {
+                    SoftPwm.softPwmWrite(PinAssignments.Displays.BACKLIGHT.getAddress(), command.ledValue);
+                    until = currentTimeMillis() + 125L;
+                }
+                if (command.data != null) {
+                    displaySelector.write(command.displayNumber.selector);
+                    for (byte[] data : command.data) {
+                        for (int i = 0, r = data.length; r > 0; i += 2000, r -= 2000) {
+                            displayBus.write(data, i, Math.min(r, 2000));
+                        }
                     }
+                    until = currentTimeMillis() + command.extraWaitTime;
                 }
-                waitUntil[command.displayNumber.ordinal()] = currentTimeMillis() + 125L + Math.round(sendTime) ;
+                waitUntil[command.displayNumber.ordinal()] = until;
                 command = null;
             } catch (InterruptedException e) {
                 // don't care
@@ -144,27 +156,52 @@ public class DisplayBus {
         }
     }
 
+    private void sleepUntil(long until) throws InterruptedException {
+        for (long now = currentTimeMillis(); now > until; now = currentTimeMillis()) {
+            Thread.sleep(now - until);
+        }
+    }
+
     private static class Command {
         final DisplayNumber displayNumber;
         final byte[][] data;
+        final long extraWaitTime;
         final int ledValue;
+        final boolean reset500ms;
 
         private Command(DisplayNumber displayNumber, byte[][] data) {
+            this(displayNumber, data, 0L);
+        }
+
+        private Command(DisplayNumber displayNumber, byte[][] data, long extraWaitTime) {
             assert displayNumber != null;
             assert data != null && data.length > 0;
             this.displayNumber = displayNumber;
             this.data = data;
+            this.extraWaitTime = Math.max(0, Math.min(2500, extraWaitTime));
             this.ledValue = -1;
+            this.reset500ms = false;
         }
 
-        private Command(float led) {
+        private Command(float ledValue) {
             this.displayNumber = null;
             this.data = null;
-            this.ledValue = Math.round(Math.max(0.0f, Math.min(1.0f, led)) * 64);
+            this.extraWaitTime = 0L;
+            this.ledValue = Math.round(Math.max(0.0f, Math.min(1.0f, ledValue)) * 64);
+            this.reset500ms = false;
+        }
+
+        private Command() {
+            this.displayNumber = null;
+            this.data = null;
+            this.extraWaitTime = 0L;
+            this.ledValue = -1;
+            this.reset500ms = true;
         }
     }
 
-    private static byte[][] getColorBars() {
+    private static byte[][] getColorBars() throws IOException {
+        @SuppressWarnings("SpellCheckingInspection")
         byte[] png = Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAKAAAACACAMAAAC7vZIpAAABO1BMVEUCAgIKAAIE" +
                                                 "BAQFBQUGBgYRCB0PChAQDAsPCxkPCxwRDBAKDwkKDhcPDgkLDhUPDgoODg4LDw4R" +
                                                 "DgcODhAKDxINDw4NEAcKEBAPDw8IEgoMEQ1JAQIfDhRPAgoSExcMFhUUFBQTFRQM" +
@@ -183,14 +220,7 @@ public class DisplayBus {
                                                 "HAkrCO9szFPlZmQHJVe1rX5t9Tozay/xZmtqdNxWkfNTmck+gd1BljVAgAABAgQI" +
                                                 "ECBAgAABAgQIECBAgH8CvqcHaAJf1u+AH2W5R6gIl+R/AAAAAElFTkSuQmCC");
         BufferedImage bufferedImage;
-        try {
-            bufferedImage = ImageIO.read(new ByteArrayInputStream(png));
-        } catch (IOException e) {
-            throw new RuntimeException(e.getMessage(), e);
-        }
-        Graphics2D g = (Graphics2D)bufferedImage.getGraphics();
-        g.setColor(Color.BLACK);
-        g.fillRect(0, 0, 160, 128);
+        bufferedImage = ImageIO.read(new ByteArrayInputStream(png));
 
         int i = 0;
         byte[] buf = new byte[61441];
@@ -210,7 +240,8 @@ public class DisplayBus {
     public static void main(String[] args) throws InterruptedException {
         try {
             DisplayBus displayBus = new DisplayBus(GpioFactory.getInstance());
-            displayBus.sendCommand(DisplayNumber.DISPLAY0, ButtonFace.getInitCommands());
+            displayBus.sendCommand(DisplayNumber.ALL, ButtonFace.getInitCommands());
+            Thread.sleep(1000L);
             displayBus.sendCommand(DisplayNumber.DISPLAY0, getColorBars());
             Thread.sleep(5000L);
             System.exit(0);

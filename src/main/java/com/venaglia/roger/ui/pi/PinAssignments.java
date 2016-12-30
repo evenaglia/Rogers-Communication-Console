@@ -41,6 +41,7 @@ public interface PinAssignments {
         Pin MOSI      = PiFacePin.GPIO_10;
         Pin MISO      = PiFacePin.GPIO_09;
         Pin CLK       = PiFacePin.GPIO_11;
+        Pin RESET     = PiFacePin.GPIO_04;
         Pin BACKLIGHT = PiFacePin.GPIO_18;
     }
 

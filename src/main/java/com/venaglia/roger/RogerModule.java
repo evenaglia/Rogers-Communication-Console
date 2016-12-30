@@ -60,7 +60,7 @@ public class RogerModule extends AbstractModule {
             bind(UI.class).to(SimUI.class);
         } else {
             bind(UI.class).to(HardUI.class);
-            bind(GpioController.class).toInstance(GpioFactory.getInstance());
+            bind(GpioController.class).toProvider(GpioFactory::getInstance);
         }
         bind(ScheduledExecutorService.class).toInstance(new ScheduledThreadPoolExecutor(4, new ThreadFactory() {
 

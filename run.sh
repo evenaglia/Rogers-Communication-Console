@@ -8,6 +8,7 @@ if [ ! -e "runtime.cp" ]; then
   mvn -DexcludeGroupIds=com.pi4j -Dmdep.outputFile=runtime.cp dependency:build-classpath
 fi
 export CP=~/Rogers-Communication-Console/target/classes:`cat runtime.cp`:/opt/pi4j/lib/'*'
-popd
+popd > /dev/null
+gpio load spi || echo "Failed to load kernel SPI drivers" && exit 1
 echo java -cp "$CP" com.venaglia.roger.ui.pi.DisplayBus
 sudo java -cp "$CP" com.venaglia.roger.ui.pi.DisplayBus

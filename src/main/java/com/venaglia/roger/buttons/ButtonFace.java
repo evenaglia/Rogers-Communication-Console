@@ -39,7 +39,6 @@ public class ButtonFace {
     public static final ButtonFace NIL = new ButtonFace();
 
     private static final int IMAGE_COMMAND_BYTES = 128 * 160 * 3 + 1;
-    private static final byte[] RESET = buildCommand(0x01);
     private static final byte[] SET_DISPLAY_OFF = buildCommand(0x28);
     private static final byte[] SET_DISPLAY_ROTATION = buildCommand(0x36, 0b01100000);
     private static final byte[] SET_DISPLAY_CLEAR = buildCommand(0x2C, new int[160*128]);
