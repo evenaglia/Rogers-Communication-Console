@@ -66,10 +66,10 @@ public class DisplayBus {
 
     private static final int PWM_RANGE = 1000;
 
-    private final SpiDevice displayBus;
-    private final SpiDevice displaySelector;
-    private final GpioPinDigitalOutput reset;
-    private final GpioPinPwmOutput backlight;
+//    private final SpiDevice displayBus;
+//    private final SpiDevice displaySelector;
+//    private final GpioPinDigitalOutput reset;
+//    private final GpioPinPwmOutput backlight;
     private final BlockingQueue<Command> queue;
     private final Runnable writeLoop = new Runnable() {
         @Override
@@ -85,22 +85,20 @@ public class DisplayBus {
 //        if (Gpio.wiringPiSetup() != 0) {
 //            throw new IOException("GPIO setup was unsuccessful!");
 //        }
-        displayBus = SpiFactory.getInstance(SpiChannel.CS0, SpiDevice.DEFAULT_SPI_SPEED, SpiDevice.DEFAULT_SPI_MODE);
-        displaySelector = SpiFactory.getInstance(SpiChannel.CS1, SpiDevice.DEFAULT_SPI_SPEED, SpiDevice.DEFAULT_SPI_MODE);
-        Gpio.pinMode(PinAssignments.Displays.RESET.getAddress(), Gpio.OUTPUT);
-        Gpio.digitalWrite(PinAssignments.Displays.RESET.getAddress(), Gpio.LOW);
-        reset = gpioController.provisionDigitalOutputPin(PinAssignments.Displays.RESET, PinState.HIGH);
-        reset.setShutdownOptions(false, PinState.LOW);
-        backlight = gpioController.provisionPwmOutputPin(PinAssignments.Displays.BACKLIGHT);
-        Gpio.pwmSetMode(Gpio.PWM_MODE_MS);
-        Gpio.pwmSetRange(PWM_RANGE);
-        Gpio.pwmSetClock(100);
-        Gpio.pwmWrite(PinAssignments.Displays.BACKLIGHT.getAddress(), 32);
+//        Gpio.pinMode(PinAssignments.Displays.RESET.getAddress(), Gpio.OUTPUT);
+//        Gpio.digitalWrite(PinAssignments.Displays.RESET.getAddress(), Gpio.LOW);
+//        reset = gpioController.provisionDigitalOutputPin(PinAssignments.Displays.RESET, PinState.HIGH);
+//        reset.setShutdownOptions(false, PinState.LOW);
+//        backlight = gpioController.provisionPwmOutputPin(PinAssignments.Displays.BACKLIGHT);
+//        Gpio.pwmSetMode(Gpio.PWM_MODE_MS);
+//        Gpio.pwmSetRange(PWM_RANGE);
+//        Gpio.pwmSetClock(100);
+//        Gpio.pwmWrite(PinAssignments.Displays.BACKLIGHT.getAddress(), 32);
         queue = new ArrayBlockingQueue<>(256, true);
         Thread spiWriterThread = new Thread(writeLoop, "Display Bus Writer");
         spiWriterThread.setDaemon(true);
         spiWriterThread.start();
-        reset(true);
+//        reset(true);
     }
 
     public void reset(boolean hard) {
@@ -137,26 +135,35 @@ public class DisplayBus {
     private void writeLoop() {
         long[] waitUntil = new long[DisplayNumber.values().length];
         Command command = null;
+        SpiDevice displaySelector = null; 
+        // SpiDevice displayBus = null; 
+        try {
+            // displayBus = SpiFactory.getInstance(SpiChannel.CS1, SpiDevice.DEFAULT_SPI_SPEED, SpiDevice.DEFAULT_SPI_MODE);
+            displaySelector = SpiFactory.getInstance(SpiChannel.CS0, SpiDevice.DEFAULT_SPI_SPEED, SpiDevice.DEFAULT_SPI_MODE);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         while (true) {
             try {
                 command = command == null ? queue.take() : command;
                 long until = waitUntil[command.displayNumber.ordinal()];
-                sleepUntil(until);
+//                sleepUntil(until);
                 until = 0;
                 if (command.reset500ms) {
                     displaySelector.write(command.displayNumber.selector);
-                    reset.pulse(300, PinState.LOW, false);
+//                    reset.pulse(300, PinState.LOW, false);
                     sleepUntil(currentTimeMillis() + 500L);
                 }
                 if (command.ledValue >= 0 && command.ledValue <= PWM_RANGE) {
-                    backlight.setPwm(command.ledValue);
+//                    backlight.setPwm(command.ledValue);
                     until = currentTimeMillis() + 125L;
                 }
                 if (command.data != null) {
+System.out.printf("Sending data to CS0: byte[%d] = %x", command.displayNumber.selector.length, command.displayNumber.selector[0]);
                     displaySelector.write(command.displayNumber.selector);
                     for (byte[] data : command.data) {
                         for (int i = 0, r = data.length; r > 0; i += 2000, r -= 2000) {
-                            displayBus.write(data, i, Math.min(r, 2000));
+                     //       displayBus.write(data, i, Math.min(r, 2000));
                         }
                     }
                     until = currentTimeMillis() + command.extraWaitTime;
