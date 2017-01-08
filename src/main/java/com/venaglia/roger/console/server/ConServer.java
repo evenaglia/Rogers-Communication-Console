@@ -152,6 +152,9 @@ public abstract class ConServer implements Runnable {
                                 response = scan();
                                 break;
                             case "test":
+                                if (secret == null) {
+                                    socket.setSoTimeout(300000);
+                                }
                                 checkAuth("test", auth);
                                 lcd(Arrays.asList("reset", "hard"));
                                 lcd(Arrays.asList("wake", "0xff"));
