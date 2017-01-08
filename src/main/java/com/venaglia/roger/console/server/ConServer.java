@@ -37,6 +37,7 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
@@ -177,6 +178,8 @@ public abstract class ConServer implements Runnable {
                     out.println(response);
                     out.flush();
                 }
+            } catch (SocketTimeoutException e) {
+                // don't care
             } catch (Exception e) {
                 e.printStackTrace();
             } finally {

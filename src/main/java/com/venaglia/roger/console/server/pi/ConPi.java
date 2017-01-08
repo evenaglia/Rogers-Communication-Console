@@ -39,7 +39,6 @@ import com.venaglia.roger.console.server.ConServer;
 import com.venaglia.roger.console.server.Con;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.function.Consumer;
 
 /**
@@ -109,6 +108,9 @@ public class ConPi extends ConServer {
     @Override
     protected Con getCon() {
         return new Con() {
+
+            private final CommandStream commandStream = new CommandStream();
+
             @Override
             public void brightness(int value) {
                 brightness.setPwm(value);
@@ -199,17 +201,13 @@ public class ConPi extends ConServer {
             }
 
             private final byte[] selectorBuffer = { 0 };
-            private final byte[] commandBuffer = { 0 };
 
             private void sendCommandAndData(byte to, int command, byte... data) throws IOException {
                 selectorBuffer[0] = to;
-                commandBuffer[0] = (byte)command;
+                commandStream.load((byte)command, data);
                 displaySelector.write(selectorBuffer);
-                displayBus.write(commandBuffer);
-                for (int i = 0, l = data.length; i < l; i += 2000) {
-                    // Break in to 2KiB chunks to avoid buffer overruns in the native code.
-                    displayBus.write(data, i, Math.min(2000, l - i));
-                }
+                displayBus.write(commandStream);
+                commandStream.unload();
             }
         };
     }
