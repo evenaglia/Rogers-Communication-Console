@@ -121,7 +121,7 @@ public class ConPi extends ConServer {
                     byte[] value = super.get(key);
                     if (value == null && key instanceof Integer) {
                         int length = (Integer)key;
-                        if (length > 0 && length <= 2048) {
+                        if (length >= 0 && length <= 2048) {
                             value = new byte[length];
                             super.put((Integer)key, value);
                         } else throw new ArrayIndexOutOfBoundsException(length);
