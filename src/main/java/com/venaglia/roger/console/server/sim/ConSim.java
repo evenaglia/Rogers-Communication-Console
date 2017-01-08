@@ -186,9 +186,9 @@ public class ConSim extends ConServer {
                 double seconds = 0;
                 for (int c : bytes) {
                     long totalBytes = 1 + 1 + c; // selector byte + command byte + data bytes
-                    seconds = (totalBytes * 9 / DATA_RATE) + 0.000015 + (c > 0 ? 0.000015 : 0); // add 15-30µS for delays in bus timing
+                    seconds = (totalBytes * 9 / DATA_RATE) + 0.00025; // add 250µS for delay between selector and lcd data
                 }
-                return Math.round(Math.ceil(seconds * 1000.0));
+                return Math.round(Math.ceil(seconds * 1000.0)); // always round up to the next ms
             }
 
             @Override

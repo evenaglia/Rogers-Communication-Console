@@ -35,10 +35,15 @@ import com.pi4j.io.spi.SpiChannel;
 import com.pi4j.io.spi.SpiDevice;
 import com.pi4j.io.spi.SpiFactory;
 import com.pi4j.wiringpi.Gpio;
+import com.pi4j.wiringpi.Spi;
 import com.venaglia.roger.console.server.ConServer;
 import com.venaglia.roger.console.server.Con;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Consumer;
 
 /**
@@ -110,6 +115,20 @@ public class ConPi extends ConServer {
         return new Con() {
 
             private final CommandStream commandStream = new CommandStream();
+            private final Map<Integer,byte[]> buffers = new HashMap<Integer,byte[]>() {
+                @Override
+                public byte[] get(Object key) {
+                    byte[] value = super.get(key);
+                    if (value == null && key instanceof Integer) {
+                        int length = (Integer)key;
+                        if (length > 0 && length <= 2048) {
+                            value = new byte[length];
+                            super.put((Integer)key, value);
+                        } else throw new ArrayIndexOutOfBoundsException(length);
+                    }
+                    return value;
+                }
+            };
 
             @Override
             public void brightness(int value) {
@@ -200,14 +219,22 @@ public class ConPi extends ConServer {
                 columnPins[2].setMode(DIGITAL_INPUT);
             }
 
-            private final byte[] selectorBuffer = { 0 };
-
             private void sendCommandAndData(byte to, int command, byte... data) throws IOException {
-                selectorBuffer[0] = to;
+                commandStream.load(to, buffers.get(0));
+                txd(SpiChannel.CS0, commandStream);
                 commandStream.load((byte)command, data);
-                displaySelector.write(selectorBuffer);
-                displayBus.write(commandStream);
+                txd(SpiChannel.CS1, commandStream);
                 commandStream.unload();
+            }
+
+            private void txd(SpiChannel channel, InputStream data) throws IOException {
+                for (int a = data.available(); a > 0; a = data.available()) {
+                    int b = Math.min(a, 2000);
+                    byte[] buffer = buffers.get(b);
+                    int read = data.read(buffer, 0, b);
+                    assert read == b;
+                    Spi.wiringPiSPIDataRW(channel.getChannel(), buffer);
+                }
             }
         };
     }
