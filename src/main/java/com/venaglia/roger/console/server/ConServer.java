@@ -17,8 +17,8 @@
 
 package com.venaglia.roger.console.server;
 
-import static com.google.common.base.Charsets.UTF_8;
 import static java.lang.System.currentTimeMillis;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.venaglia.roger.console.server.pi.ConPi;
 import com.venaglia.roger.console.server.sim.ConSim;
