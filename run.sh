@@ -11,7 +11,7 @@ export CP=~/Rogers-Communication-Console/target/classes:`cat runtime.cp`
 popd > /dev/null
 
 nc -z 127.0.0.1 65432
-if ["$?" -ne 0] then
+if ["$?" -ne 0]; then
   pushd ~/Rogers-Communication-Console/target/classes
   sudo pi4j com.venaglia.roger.console.server.ConServer
   popd
