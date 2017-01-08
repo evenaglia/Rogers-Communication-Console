@@ -75,10 +75,15 @@ public class ConPi extends ConServer {
         displayBus = SpiFactory.getInstance(SpiChannel.CS1, SpiDevice.DEFAULT_SPI_SPEED);
         displaySelector.write((byte)0);
         displayBus.write((byte)0, (byte)0);
-        lcd(Arrays.asList("reset", "0xff")); // soft reset of all lcd displays
+
+        Con con = getCon();
         for (String id : "0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80".split(",")) {
-            image(Arrays.asList("show", "@color-bars", id));
+            byte[] colorBars = getColorBars();
+            byte who = (byte)Integer.parseInt(id.substring(2, 16));
+            con.wake(who);
+            con.updateImage(who, colorBars);
         }
+        con.brightness(1000);
 
         GpioController gpioController = new GpioControllerImpl(GpioFactory.getDefaultProvider());
         reset = gpioController.provisionDigitalOutputPin(PinAssignments.Displays.RESET, PinState.HIGH);
