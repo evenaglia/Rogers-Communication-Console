@@ -83,7 +83,6 @@ public class ConPi extends ConServer {
             con.wake(who);
             con.updateImage(who, colorBars);
         }
-        con.brightness(1000);
 
         GpioController gpioController = new GpioControllerImpl(GpioFactory.getDefaultProvider());
         reset = gpioController.provisionDigitalOutputPin(PinAssignments.Displays.RESET, PinState.HIGH);
@@ -103,7 +102,8 @@ public class ConPi extends ConServer {
         Gpio.pwmSetMode(Gpio.PWM_MODE_MS);
         Gpio.pwmSetRange(PWM_RANGE);
         Gpio.pwmSetClock(100);
-        brightness.setPwm(32);
+
+        con.brightness(1000);
     }
 
     @Override
