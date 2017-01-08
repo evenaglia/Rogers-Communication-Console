@@ -15,10 +15,13 @@
  *
  */
 
-package com.venaglia.roger.ui.pi;
+package com.venaglia.roger.ui.impl;
 
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import com.google.common.cache.CacheBuilder;
 import com.venaglia.roger.buttons.Button;
 import com.venaglia.roger.buttons.SimpleButtonListener;
 import com.venaglia.roger.output.OutputWindow;
@@ -32,6 +35,7 @@ import javax.swing.WindowConstants;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.util.Arrays;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -39,28 +43,34 @@ import java.util.concurrent.TimeUnit;
  * Created by ed on 10/20/16.
  */
 @Singleton
-public class HardUI implements UI {
+public class UIImpl implements UI {
 
     private final Button[] buttons = new Button[7];
     private final Button[] hardButtons = new Button[5];
     private final OutputWindow outputWindow;
-    private final ButtonScanner buttonScanner;
     private final ButtonProcessor buttonProcessor;
-    private final DisplayBus displayBus;
+    private final ConClient conClient;
+    private final LoadingCache<Button,DisplayUpdateCommand> commandCache;
+    private final ScanButtonsCommand readButtons;
 
-    private ButtonScanner.ScanCode scanCode = ButtonScanner.ScanCode.NO_BUTTONS_DOWN;
+    private ScanCode scanCode = ScanCode.NO_BUTTONS_DOWN;
     private Button down = null;
 
     @Inject
-    public HardUI(OutputWindow outputWindow,
-                  ButtonScanner buttonScanner,
+    public UIImpl(OutputWindow outputWindow,
                   ScheduledExecutorService executor,
                   ButtonProcessor buttonProcessor,
-                  DisplayBus displayBus) {
+                  ConClient conClient) {
         this.outputWindow = outputWindow;
-        this.buttonScanner = buttonScanner;
         this.buttonProcessor = buttonProcessor;
-        this.displayBus = displayBus;
+        this.conClient = conClient;
+        this.commandCache = CacheBuilder.newBuilder().initialCapacity(128).build(new CacheLoader<Button, DisplayUpdateCommand>() {
+            @Override
+            public DisplayUpdateCommand load(Button button) throws Exception {
+                return new DisplayUpdateCommand(button.getButtonFace().getImageDataRGB());
+            }
+        });
+        this.readButtons = new ScanButtonsCommand(this::processScanCode);
         executor.scheduleAtFixedRate(this::pollButtons, 250, 50, TimeUnit.MILLISECONDS);
         Arrays.fill(buttons, Button.NIL);
         Arrays.fill(hardButtons, Button.NIL);
@@ -93,7 +103,14 @@ public class HardUI implements UI {
         assert b != null;
         if (!dest[idx].getId().equals(b.getId())) {
             dest[idx] = b;
-            displayBus.sendCommand(DisplayBus.DisplayNumber.values()[idx], b.getButtonFace().getButtonUpdateCommands());
+            DisplayUpdateCommand command = null;
+            try {
+                command = commandCache.get(b);
+            } catch (ExecutionException e) {
+                throw new RuntimeException(e.getMessage(), e);
+            }
+            command.setDisplayNumber(DisplayNumber.values()[idx]);
+            conClient.sendCommand(command);
         }
     }
 
@@ -137,7 +154,10 @@ public class HardUI implements UI {
     }
 
     private void pollButtons() {
-        ButtonScanner.ScanCode scanCode = buttonScanner.scan();
+        conClient.sendCommand(readButtons);
+    }
+
+    private void processScanCode(ScanCode scanCode) {
         if (this.scanCode == scanCode) return;
         if (down != null) {
             buttonProcessor.handleButtonUp(down);
@@ -150,20 +170,20 @@ public class HardUI implements UI {
         }
     }
 
-    private Button forScanCode(ButtonScanner.ScanCode scanCode) {
+    private Button forScanCode(ScanCode scanCode) {
         switch (scanCode) {
-            case BUTTON_00_DOWN: return null; // todo
-            case BUTTON_01_DOWN: return null; // todo
-            case BUTTON_02_DOWN: return null; // todo
-            case BUTTON_03_DOWN: return null; // todo
-            case BUTTON_10_DOWN: return null; // todo
-            case BUTTON_11_DOWN: return null; // todo
-            case BUTTON_12_DOWN: return null; // todo
-            case BUTTON_13_DOWN: return null; // todo
-            case BUTTON_20_DOWN: return null; // todo
-            case BUTTON_21_DOWN: return null; // todo
-            case BUTTON_22_DOWN: return null; // todo
-            case BUTTON_23_DOWN: return null; // todo
+            case BUTTON_A1_DOWN: return hardButtons[1];
+            case BUTTON_A2_DOWN: return buttons[0];
+            case BUTTON_A3_DOWN: return hardButtons[0];
+            case BUTTON_A4_DOWN: return buttons[4];
+            case BUTTON_B1_DOWN: return hardButtons[2];
+            case BUTTON_B2_DOWN: return buttons[1];
+            case BUTTON_B3_DOWN: return buttons[2];
+            case BUTTON_B4_DOWN: return buttons[5];
+            case BUTTON_C1_DOWN: return hardButtons[3];
+            case BUTTON_C2_DOWN: return buttons[3];
+            case BUTTON_C3_DOWN: return hardButtons[4];
+            case BUTTON_C4_DOWN: return buttons[6];
             default: return null;
         }
     }

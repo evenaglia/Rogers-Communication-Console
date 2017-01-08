@@ -17,7 +17,6 @@
 
 package com.venaglia.roger.buttons;
 
-import com.venaglia.Environment;
 import com.venaglia.roger.bundle.Bundle;
 
 import javax.imageio.ImageIO;
@@ -29,7 +28,6 @@ import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
 
 /**
  * Created by ed on 12/7/16.
@@ -38,23 +36,23 @@ public class ButtonFace {
 
     public static final ButtonFace NIL = new ButtonFace();
 
-    private static final int IMAGE_COMMAND_BYTES = 128 * 160 * 3 + 1;
-    private static final byte[] SET_DISPLAY_OFF = buildCommand(0x28);
-    private static final byte[] SET_DISPLAY_ROTATION = buildCommand(0x36, 0b01100000);
-    private static final byte[] SET_DISPLAY_CLEAR = buildCommand(0x2C, new int[160*128]);
-    private static final byte[] SET_DISPLAY_ON = buildCommand(0x29);
-    private static final byte[] SET_COLUMN_0_COMMAND = buildCommand(0x2A, 0, 0, 0, 159);
-    private static final byte[] SET_ROW_0_COMMAND = buildCommand(0x2B, 0, 0, 0, 127);
+//    private static final int IMAGE_COMMAND_BYTES = 128 * 160 * 3 + 1;
+//    private static final byte[] SET_DISPLAY_OFF = buildCommand(0x28);
+//    private static final byte[] SET_DISPLAY_ROTATION = buildCommand(0x36, 0b01100000);
+//    private static final byte[] SET_DISPLAY_CLEAR = buildCommand(0x2C, new int[160*128]);
+//    private static final byte[] SET_DISPLAY_ON = buildCommand(0x29);
+//    private static final byte[] SET_COLUMN_0_COMMAND = buildCommand(0x2A, 0, 0, 0, 159);
+//    private static final byte[] SET_ROW_0_COMMAND = buildCommand(0x2B, 0, 0, 0, 127);
 
-    private static byte[] buildCommand(int command, int... data) {
-        byte[] buf = new byte[data.length + 1];
-        int i = 0;
-        buf[i++] = (byte)command;
-        for (int v : data) {
-            buf[i++] = (byte)v;
-        }
-        return buf;
-    }
+//    private static byte[] buildCommand(int command, int... data) {
+//        byte[] buf = new byte[data.length + 1];
+//        int i = 0;
+//        buf[i++] = (byte)command;
+//        for (int v : data) {
+//            buf[i++] = (byte)v;
+//        }
+//        return buf;
+//    }
 
     private final String filename;
     private final String label;
@@ -62,7 +60,8 @@ public class ButtonFace {
     private final Font font;
 
     private BufferedImage bufferedImage;
-    private byte[][] buttonFaceData;
+//    private byte[][] buttonFaceData;
+    private byte[] imageDataRGB;
 
     private ButtonFace() {
         this.filename = null;
@@ -88,29 +87,18 @@ public class ButtonFace {
         return label;
     }
 
-    public BufferedImage getBufferedImage() {
-        if (Environment.CURRENT_ENVIRONMENT != Environment.DEVELOPMENT) {
-            throw new IllegalStateException("Buffered images are not permitted outside of development");
-        }
-        if (bufferedImage == null) {
-            this.bufferedImage = bufferImageImpl();
-        }
-        return bufferedImage;
-    }
-
-    public byte[][] getButtonUpdateCommands() {
-        if (buttonFaceData == null) {
-            byte[] buf = new byte[IMAGE_COMMAND_BYTES];
+    public byte[] getImageDataRGB() {
+        if (imageDataRGB == null) {
+            byte[] buf = new byte[128 * 160 * 3];
             int i = 0;
-            buf[i++] = (byte)0x2C; // RAMWR
             for (int argb : bufferImageImpl().getRGB(0, 0, 160, 128, null, 0, 160)) {
                 buf[i++] = (byte)((argb >> 16) & 0xFF);
                 buf[i++] = (byte)((argb >> 8) & 0xFF);
                 buf[i++] = (byte)(argb & 0xFF);
             }
-            buttonFaceData = new byte[][]{ SET_COLUMN_0_COMMAND, SET_ROW_0_COMMAND, buf };
+            imageDataRGB = buf;
         }
-        return buttonFaceData;
+        return imageDataRGB;
     }
 
     public InputStream readOriginalFile() throws IOException {
@@ -142,14 +130,14 @@ public class ButtonFace {
         }
     }
 
-    public static byte[][] getInitCommands() {
-        return new byte[][]{
-                SET_DISPLAY_OFF,
-                SET_DISPLAY_ROTATION,
-                SET_COLUMN_0_COMMAND,
-                SET_ROW_0_COMMAND,
-                SET_DISPLAY_CLEAR,
-                SET_DISPLAY_ON
-        };
-    }
+//    public static byte[][] getInitCommands() {
+//        return new byte[][]{
+//                SET_DISPLAY_OFF,
+//                SET_DISPLAY_ROTATION,
+//                SET_COLUMN_0_COMMAND,
+//                SET_ROW_0_COMMAND,
+//                SET_DISPLAY_CLEAR,
+//                SET_DISPLAY_ON
+//        };
+//    }
 }

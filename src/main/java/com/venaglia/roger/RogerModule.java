@@ -20,9 +20,6 @@ package com.venaglia.roger;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 import com.google.inject.name.Named;
-import com.pi4j.io.gpio.GpioController;
-import com.pi4j.io.gpio.GpioFactory;
-import com.venaglia.Environment;
 import com.venaglia.roger.autocomplete.AutoCompleter;
 import com.venaglia.roger.autocomplete.impl.DummyAutoCompleter;
 import com.venaglia.roger.buttons.ButtonSet;
@@ -33,8 +30,7 @@ import com.venaglia.roger.menu.MenuTree;
 import com.venaglia.roger.menu.MenuTreeLoader;
 import com.venaglia.roger.ui.FontLoader;
 import com.venaglia.roger.ui.UI;
-import com.venaglia.roger.ui.pi.HardUI;
-import com.venaglia.roger.ui.sim.SimUI;
+import com.venaglia.roger.ui.impl.UIImpl;
 
 import java.awt.*;
 import java.util.NavigableSet;
@@ -56,12 +52,7 @@ public class RogerModule extends AbstractModule {
         bind(ButtonSet.class).toProvider(ButtonSetLoader.class);
         bind(EmojiSet.class).toProvider(EmojiSetLoader.class);
         bind(MenuTree.class).toProvider(MenuTreeLoader.class);
-        if (Environment.CURRENT_ENVIRONMENT == Environment.DEVELOPMENT) {
-            bind(UI.class).to(SimUI.class);
-        } else {
-            bind(UI.class).to(HardUI.class);
-            bind(GpioController.class).toProvider(GpioFactory::getInstance);
-        }
+        bind(UI.class).to(UIImpl.class);
         bind(ScheduledExecutorService.class).toInstance(new ScheduledThreadPoolExecutor(4, new ThreadFactory() {
 
             private final NavigableSet<Integer> unused = new TreeSet<>();

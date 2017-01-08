@@ -15,13 +15,7 @@
  *
  */
 
-package com.venaglia.roger.ui.sim;
-
-import com.google.inject.Inject;
-import com.google.inject.name.Named;
-import com.venaglia.roger.buttons.Button;
-import com.venaglia.roger.buttons.ButtonFace;
-import com.venaglia.roger.buttons.SimpleButtonListener;
+package com.venaglia.roger.console.server.sim;
 
 import javax.swing.*;
 import java.awt.*;
@@ -33,6 +27,9 @@ import java.awt.geom.QuadCurve2D;
 import java.awt.geom.RoundRectangle2D;
 import java.awt.image.BufferedImage;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -43,29 +40,27 @@ public class VirtualButton extends JComponent {
     private static final int BUMPER_WIDTH = 72;
     private static final int BASE_WIDTH = 160;
     private static final int BASE_HEIGHT = 128;
-    private static final AtomicReference<BufferedImage> CHECKERBOARD = new AtomicReference<>();
 
-    private volatile com.venaglia.roger.buttons.Button btn = Button.NIL;
-    private SimpleButtonListener buttonListener;
+    private BufferedImage altImage = new BufferedImage(160, 128, BufferedImage.TYPE_INT_ARGB);
 
     private final ButtonClass buttonClass;
     private final float width;
     private final float height;
     private final float imageWidth;
-    private final float textBoxHeight;
     private final Shape[] frame;
-    private final Font font;
     private final BasicStroke stroke;
     private final MyMouseHandler mouseHandler;
+    private final AtomicReference<BufferedImage> image = new AtomicReference<>(new BufferedImage(160, 128, BufferedImage.TYPE_INT_ARGB));
+    private final ConsumerSupplier<Boolean> buttonState = new ConsumerSupplier<>(false);
+    private final Lock updateLock = new ReentrantLock(true);
 
     private double rotate = 0.0;
 
-    @Inject
-    public VirtualButton(Font font, @Named("UIScale") float scale) {
-        this(font, scale, ButtonClass.DYNAMIC_IMAGE);
+    public VirtualButton(float scale) {
+        this(scale, ButtonClass.DYNAMIC_IMAGE);
     }
 
-    VirtualButton(Font font, float scale, ButtonClass buttonClass) {
+    VirtualButton(float scale, ButtonClass buttonClass) {
         super();
         this.buttonClass = buttonClass;
         switch (buttonClass) {
@@ -84,16 +79,14 @@ public class VirtualButton extends JComponent {
                 break;
         }
         if (buttonClass.isHardButton()) {
-            imageWidth = textBoxHeight = 0;
+            imageWidth = 0;
             setSize(Math.round(width), Math.round(height));
             float r = Math.min(width, height);
             frame = new Shape[] {
-                    new RoundRectangle2D.Float(0, 0, width, height, r, r)
+                    new RoundRectangle2D.Float(1, 1, width - 2, height - 2, r, r)
             };
-            this.font = null;
         } else {
             imageWidth = BASE_WIDTH * scale;
-            textBoxHeight = (BASE_HEIGHT - 12.0f) * scale;
             setSize(Math.round(240.0f * scale), Math.round(160.0f * scale));
             float dx = width * 0.5f;
             float dx2 = imageWidth * 0.5f;
@@ -106,46 +99,51 @@ public class VirtualButton extends JComponent {
                     new Line2D.Float(-dx2, -dy, dx2, -dy),
                     new Line2D.Float(-dx2, dy, dx2, dy)
             };
-            this.font = font.deriveFont(12.0f * scale);
-            if (CHECKERBOARD.get() == null) {
-                BufferedImage checkerboard = new BufferedImage(160, 128, BufferedImage.TYPE_INT_ARGB);
-                Graphics g = checkerboard.getGraphics();
-                g.setColor(new Color(0, 0, 0, 32));
-                for (int y = 0, i = 0; y < 128; y += 8, i = 8 - i) {
-                    for (int x = i; x < 160; x += 16) {
-                        g.fillRect(x, y, 8, 8);
-                    }
-                }
-            }
         }
         stroke = new BasicStroke(0.5f * scale);
         mouseHandler = new MyMouseHandler();
-        mouseHandler.configure(() -> btn, new SimpleButtonListener() {
-
-            @Override
-            public void handleButtonDown(Button button) {
-                if (buttonListener != null) buttonListener.handleButtonDown(button);
-            }
-
-            @Override
-            public void handleButtonUp(Button button) {
-                if (buttonListener != null) buttonListener.handleButtonUp(button);
-            }
-        });
+        mouseHandler.configure(buttonState);
         addMouseListener(mouseHandler);
+    }
+
+    public Supplier<Boolean> getButtonStateSupplier() {
+        return buttonState;
+    }
+
+    public void setImageBytesRgb(byte[] imageBytesRgb) {
+        assert imageBytesRgb != null;
+        assert imageBytesRgb.length == 160 * 128 * 3;
+        updateLock.lock();
+        try {
+            int i = 0;
+            for (int y = 0; y < 128; y++) {
+                for (int x = 0; x < 160; x++) {
+                    int rgb = 0xFF;
+                    rgb = rgb << 8 | (imageBytesRgb[i++] & 0xFF);
+                    rgb = rgb << 8 | (imageBytesRgb[i++] & 0xFF);
+                    rgb = rgb << 8 | (imageBytesRgb[i++] & 0xFF);
+                    altImage.setRGB(x, y, rgb);
+                }
+            }
+            BufferedImage img = image.get();
+            image.set(altImage);
+            altImage = img;
+            repaint();
+        } finally {
+            updateLock.unlock();
+        }
     }
 
     @Override
     public void paint(Graphics graphics) {
         super.paint(graphics);
-        com.venaglia.roger.buttons.Button btn = this.btn;
         Graphics2D g = (Graphics2D)graphics;
         g.setColor(Color.RED);
-        g.drawRect(0, 0, getWidth(), getHeight());
+        g.drawRect(0, 0, getWidth() - 1, getHeight() - 1);
         if (buttonClass.isHardButton()) {
             g.setPaint(Color.DARK_GRAY);
-            int w = getWidth();
-            int h = getHeight();
+            int w = getWidth() - 2;
+            int h = getHeight() - 2;
             int r = Math.min(w, h);
             g.fillRoundRect(0, 0, w, h, r, r);
             g.setPaint(Color.WHITE);
@@ -160,27 +158,11 @@ public class VirtualButton extends JComponent {
                 if (rotate != 0.0) {
                     g.transform(AffineTransform.getRotateInstance(rotate));
                 }
-                ButtonFace face = btn.getButtonFace();
-                if (face != null) {
-                    g.drawImage(face.getBufferedImage(), Math.round(imageWidth * -0.5f), Math.round(height * -0.5f), Math.round(imageWidth), Math.round(height), null);
-                } else {
-                    g.setPaint(Color.DARK_GRAY);
-                    g.fillRect(Math.round(imageWidth * -0.5f), Math.round(height * -0.5f), Math.round(imageWidth), Math.round(height));
-                }
+                g.drawImage(image.get(), Math.round(imageWidth * -0.5f), Math.round(height * -0.5f), Math.round(imageWidth), Math.round(height), null);
                 g.setPaint(Color.WHITE);
                 g.setStroke(stroke);
                 for (Shape shape : frame) {
                     g.draw(shape);
-                }
-                String label = face == null ? "" : face.getLabel();
-                if (label != null && label.length() > 0) {
-                    g.setFont(font);
-                    int advance = g.getFontMetrics().stringWidth(label);
-                    int descent = g.getFontMetrics().getMaxDescent();
-                    g.drawString(label,
-                                 Math.round(advance * -0.5f),
-    //                             Math.round(0),
-                                 Math.round(textBoxHeight * 0.5f - descent));
                 }
             } finally {
                 g.setTransform(xf);
@@ -192,30 +174,6 @@ public class VirtualButton extends JComponent {
         this.rotate = rotate;
     }
 
-    public void setButton(Button btn) {
-        if (btn == null) {
-            btn = Button.NIL;
-        }
-        if (btn != this.btn) {
-            this.btn = btn;
-            repaint(1);
-        }
-    }
-
-//    public boolean addButtonListener(ButtonListener buttonListener) {
-//        assert buttonListener != null;
-//        return buttonListeners.add(buttonListener);
-//    }
-//
-//    public boolean removeButtonListener(ButtonListener buttonListener) {
-//        assert buttonListener != null;
-//        return buttonListeners.remove(buttonListener);
-//    }
-
-    public void setButtonListener(SimpleButtonListener buttonListener) {
-        this.buttonListener = buttonListener;
-    }
-
     private static class MyMouseHandler extends MouseAdapter {
 
         private enum State {
@@ -225,20 +183,20 @@ public class VirtualButton extends JComponent {
         }
 
         private State state = State.MOUSE_UP;
-        private Supplier<com.venaglia.roger.buttons.Button> buttonSupplier;
-        private SimpleButtonListener buttonListener;
+        private Consumer<Boolean> stateListener = null;
 
         @Override
         public void mousePressed(MouseEvent e) {
             state = State.MOUSE_DOWN;
-            buttonListener.handleButtonDown(buttonSupplier.get());
+            if (stateListener != null) {
+                stateListener.accept(true);
+            }
         }
 
         @Override
         public void mouseReleased(MouseEvent e) {
-            if (state == State.MOUSE_DOWN && buttonListener != null) {
-                Button button = buttonSupplier.get();
-                buttonListener.handleButtonUp(button);
+            if (state == State.MOUSE_DOWN && stateListener != null) {
+                stateListener.accept(false);
             }
         }
 
@@ -246,7 +204,9 @@ public class VirtualButton extends JComponent {
         public void mouseExited(MouseEvent e) {
             if (state == State.MOUSE_DOWN) {
                 state = State.MOUSE_DOWN_BUT_OUTSIDE;
-                buttonListener.handleButtonUp(buttonSupplier.get());
+                if (stateListener != null) {
+                    stateListener.accept(false);
+                }
             }
         }
 
@@ -255,15 +215,14 @@ public class VirtualButton extends JComponent {
             super.mouseEntered(e);
             if (state == State.MOUSE_DOWN_BUT_OUTSIDE) {
                 state = State.MOUSE_UP;
-//                buttonListener.handleButtonDown(buttonSupplier.get());
+                if (stateListener != null) {
+                    stateListener.accept(true);
+                }
             }
         }
 
-        void configure(Supplier<com.venaglia.roger.buttons.Button> buttonSupplier, SimpleButtonListener buttonListener) {
-            assert buttonSupplier != null;
-            assert buttonListener != null;
-            this.buttonSupplier = buttonSupplier;
-            this.buttonListener = buttonListener;
+        void configure(Consumer<Boolean> stateListener) {
+            this.stateListener = stateListener;
         }
     }
 
@@ -272,6 +231,25 @@ public class VirtualButton extends JComponent {
 
         boolean isHardButton() {
             return this != DYNAMIC_IMAGE;
+        }
+    }
+
+    private static class ConsumerSupplier<T> implements Consumer<T>, Supplier<T> {
+
+        private volatile T value;
+
+        public ConsumerSupplier(T value) {
+            this.value = value;
+        }
+
+        @Override
+        public void accept(T value) {
+            this.value = value;
+        }
+
+        @Override
+        public T get() {
+            return value;
         }
     }
 }

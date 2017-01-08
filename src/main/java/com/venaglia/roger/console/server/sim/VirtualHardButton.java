@@ -15,10 +15,7 @@
  *
  */
 
-package com.venaglia.roger.ui.sim;
-
-import com.google.inject.Inject;
-import com.google.inject.name.Named;
+package com.venaglia.roger.console.server.sim;
 
 /**
  * Created by ed on 9/1/16.
@@ -26,29 +23,26 @@ import com.google.inject.name.Named;
 public abstract class VirtualHardButton extends VirtualButton {
 
     VirtualHardButton(float scale, ButtonClass buttonClass) {
-        super(null, scale, buttonClass);
+        super(scale, buttonClass);
     }
 
     public static class Left extends VirtualHardButton {
 
-        @Inject
-        public Left(@Named("UIScale") float scale) {
+        public Left(float scale) {
             super(scale, ButtonClass.LEFT_BUMPER);
         }
     }
 
     public static class Right extends VirtualHardButton {
 
-        @Inject
-        public Right(@Named("UIScale") float scale) {
+        public Right(float scale) {
             super(scale, ButtonClass.RIGHT_BUMPER);
         }
     }
 
     public static class Top extends VirtualHardButton {
 
-        @Inject
-        public Top(@Named("UIScale") float scale) {
+        public Top(float scale) {
             super(scale, ButtonClass.TOP_BUMPER);
         }
     }

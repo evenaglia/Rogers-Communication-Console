@@ -15,7 +15,7 @@
  *
  */
 
-package com.venaglia.roger.ui.pi;
+package com.venaglia.roger.console.server.pi;
 
 import com.pi4j.io.gpio.Pin;
 import com.pi4j.io.gpio.RaspiPin;

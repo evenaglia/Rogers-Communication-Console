@@ -28,29 +28,13 @@ import com.pi4j.io.gpio.GpioController;
 import com.pi4j.io.gpio.GpioPinDigitalInput;
 import com.pi4j.io.gpio.GpioPinDigitalMultipurpose;
 import com.pi4j.io.gpio.PinState;
+import com.venaglia.roger.ui.impl.ScanCode;
 
 /**
  * Created by ed on 12/7/16.
  */
 @Singleton
 public class ButtonScanner {
-
-    public enum ScanCode {
-        NO_BUTTONS_DOWN,
-        BUTTON_00_DOWN,
-        BUTTON_01_DOWN,
-        BUTTON_02_DOWN,
-        BUTTON_03_DOWN,
-        BUTTON_10_DOWN,
-        BUTTON_11_DOWN,
-        BUTTON_12_DOWN,
-        BUTTON_13_DOWN,
-        BUTTON_20_DOWN,
-        BUTTON_21_DOWN,
-        BUTTON_22_DOWN,
-        BUTTON_23_DOWN,
-        MULTIPLE_BUTTONS_DOWN
-    }
 
     private final GpioPinDigitalMultipurpose columnPins[];
     private final GpioPinDigitalInput rowPins[];
