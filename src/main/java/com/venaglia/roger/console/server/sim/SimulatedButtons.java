@@ -18,7 +18,10 @@
 package com.venaglia.roger.console.server.sim;
 
 import javax.swing.JComponent;
-import java.awt.*;
+import java.awt.Color;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;

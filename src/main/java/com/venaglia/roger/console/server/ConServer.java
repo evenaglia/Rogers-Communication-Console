@@ -20,8 +20,6 @@ package com.venaglia.roger.console.server;
 import static com.google.common.base.Charsets.UTF_8;
 import static java.lang.System.currentTimeMillis;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import com.venaglia.roger.console.server.pi.ConPi;
 import com.venaglia.roger.console.server.sim.ConSim;
 import com.venaglia.roger.console.server.sim.SimulatedButtons;
@@ -59,7 +57,7 @@ public abstract class ConServer implements Runnable {
     private static final Pattern MATCH_LCD_RESET_SELECTOR = Pattern.compile("^(?:0x([0-9a-f][0-9a-f])|hard)$");
     private static final Pattern MATCH_LCD_BRIGHTNESS = Pattern.compile("^(0|[1-9][0-9]{0,2}|1000)$");
     private static final Pattern MATCH_IMAGE_NAME = Pattern.compile("^(\\w+)$");
-    private static final Pattern MATCH_IMAGE_NAME_OR_BUILT_IN = Pattern.compile("^(@color-bars|@checkerboard|\\w+)$");
+    private static final Pattern MATCH_IMAGE_NAME_OR_BUILT_IN = Pattern.compile("^(@color-bars|@checkerboard|@aspect-ratio-grid|\\w+)$");
     private static final Pattern MATCH_IMAGE_NAME_OR_ALL = Pattern.compile("^(\\*|\\w+)$");
     private static final Pattern[] MATCH_IMAGE_STORE_ARGS = {
             MATCH_IMAGE_NAME,
@@ -89,7 +87,7 @@ public abstract class ConServer implements Runnable {
 
     public ConServer() {
         this.secret = loadSecret();
-        this.imageDataCache = CacheBuilder.newBuilder().initialCapacity(256).build();
+        this.imageDataCache = new Cache<>(256);
         if (secret == null) {
             System.err.println("Console service is insecure! No secret has been set to protect it from unauthorized access.");
         }
@@ -358,8 +356,11 @@ public abstract class ConServer implements Runnable {
                     case "@checkerboard":
                         data = getCheckerboard();
                         break;
+                    case "@aspect-ratio-grid":
+                        data = getAspectRatioGrid();
+                        break;
                     default:
-                        data = imageDataCache.getIfPresent(imageName);
+                        data = imageDataCache.get(imageName);
                         break;
                 }
                 if (data == null) {
@@ -445,6 +446,56 @@ public abstract class ConServer implements Runnable {
                                                 "XItFhFUYgQhEIEEgAhGIQIJABCIQgQSBCDyjDPmyoST9GvKSeQ8/3/cmICl62/oE" +
                                                 "L5n7DzoWe5m/t5SQMs4Y0rqb00a8iK3olnKSTkjay2EOZBFBIAIRSBCIQAQikCAQ" +
                                                 "gQhEIEEgAs8ofwCxCbD+Nzru2QAAAABJRU5ErkJggg==");
+        return pngImageToRgbBytes(png);
+    }
+
+    protected static byte[] getAspectRatioGrid() throws IOException {
+        @SuppressWarnings("SpellCheckingInspection")
+        byte[] png = Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAKAAAACABAMAAAB+TX8oAAAAMFBMVEUAAAAXFxcl" +
+                                                "JSUzMzNCQkJUVFRfX19xcXF/f3+MjIydnZ2srKy9vb3Ly8vb29vn5+frgVTdAAAA" +
+                                                "AWJLR0QAiAUdSAAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB+EBCAQEDm3F" +
+                                                "IwcAAAAmaVRYdENvbW1lbnQAAAAAAENyZWF0ZWQgd2l0aCBHSU1QIG9uIGEgTWFj" +
+                                                "leRfWwAAB4hJREFUaN7tmltvE0cUx2d9tynSLpfY5qGyDSROnxwcJQ68OI4aSHjo" +
+                                                "BhAUepHdQMKlqHagOKVK5VApdVRQzaUEhyJAlJKgqq1UiRapRUgVLfBUVWrV9Au0" +
+                                                "fIM+dmZ29jLj9e6Om1ZC7Ug58Vl7fvbOnJn97zkL6vUri3XYniBzD5krd2n/I93/" +
+                                                "DPuPkF3C/izy8cvfiA8A8IrQgCIyHch4Ypofxn4K2bzmu7OMLyM7gowfGeDFgAoy" +
+                                                "vdhPacAkBmY1P4J9mfExu6D5Tw2w+DeBMgUU2mcfzsRbBwobq49munSgMNclAilz" +
+                                                "tmVgNQf7d9xQgfFD+D+Iyi0Ch/CgAf+0AvT0iQoQRHrM4tBtF4d7Y6R/eCs0Y2Mv" +
+                                                "1YDavtk9Nja2bwaasQfInMH+RfTye2SmsP8JNAd0f+99rT/0gSQlNR8E4pIktfVD" +
+                                                "s2oaGqkPmbUjyJZ0v4DshOZH9f6+EUmNQNKK5mO4KrH+RiIhmY9hwdC/hKii4UCH" +
+                                                "CdB3u348vSmRTh9cvGwC9MqG/hG1k9r8Igt0bVvMam/3LuQagEFjfx/8bM14QMgz" +
+                                                "wMDNOPX+hrrIAPuN78PxE4rMAQrYeR4wTah303FJ9+8HrhR1YIICvt4FGprwXI0C" +
+                                                "Vqh3N9BzgmdFBw7LwKxtHjEAPfRnIiBAA0MG4FAKmLekrAP99IeC9CRBoCB5u1C4" +
+                                                "VsRwETRrL8ZEHOidghQUGeAUeUWOr6xWT39dhe2PqemmPCC8MfkEfejqZPUDuv8K" +
+                                                "EADsKSubQ34nsGhCXiYXJT/7CwPsATKGt0QrIGj7goxhIMb099IHegnQXQPW7TgB" +
+                                                "uvPMLDNxWCLA/TY84Co2iUPzleLN2gFBu+lKgSF6lhpsWQFO2PLwL0HAHHW0xuwW" +
+                                                "AWW38cXsgWj/jyhxYdhtUmqUkPa8sh+OOuChnxhRB9PwJdSoCsqO7ck6AcJRjGgy" +
+                                                "SZ/TdHq77q8YSKfTmdEDjnjAfWw7/Hh6ix6xoZ1pUC4f0aZF+HS8DP25a86AoHoG" +
+                                                "ff7QT9qBd8bL6BST6hnuwRd6T6dDHgjiU3aPqbHdqUqRSWVeknlFOZxzCgSXiHJQ" +
+                                                "Fke4ommbfRcAWDPfT7RN3jFwmGibvpsicJ8sGORcuL50USTqK+iYp+wsSM75Zh/P" +
+                                                "xZoJzpJzIO5lp2CFPAcw5wAYFDmAIQfAQQ4e3g0bgB76PqXCA0TdmPsUqA9PIKn3" +
+                                                "MzKnod6TuYBboT68g/TiV0QvQn3Y1qXpwW1Q7YlcwJAkrSlperFTQvrQR41hlIuH" +
+                                                "5JbNpJT4gLCfDbDICSzYAIUsJ3CTDdDR1cTYojbAECcPdrAGJnmBHrkBSIXNKC8Q" +
+                                                "VBigJHnjWA8ikxFq3MBpD7oREl9D/SOCBKrVMwtQ6c3+ifTevdlr3MC33v8VdV0i" +
+                                                "elHbHPDvbgMyNzDrkrUb8MYkBncYwgu75Sy7UtzAdksgd1zDyLYEBkVuYMgSyL1Q" +
+                                                "nlKgqAE7WgAGVtNAqAd3QpHX/SWSeoe38AP94+dR1wvIQL2I9OF7UOSVf0HmyttN" +
+                                                "+zWdfv/8D7DniYeo/5SiDw3X5VZOeb38f9j8o0tv2TcH93JvXy1ssN3W+pD/EtBv" +
+                                                "rQ/5r3pla33IDzxlrQ8nuIEVaynSyy1F8sssloKiNTDAu1RCyy040/+2JOa87zEV" +
+                                                "7fRtRQev3gTW+lAKcs6JIFnqQ/iCbzVvrlat9WELN4+W+hD+7eLhocyR3f1yiC+s" +
+                                                "HaQIeAZxwAGQaxCbJjE8B38fBfxpFn+MAF3jS8eNwMytTa7ehZQC9Dk/580kEdSx" +
+                                                "MCD01Ps14DBO+QtDKSWz5PxehaSq1uELitCXJ8B2NVPzZgdfMs2fwZmRXeqo7yH6" +
+                                                "8LqW+b2LRF5mv9MdZzfOH/Z8p0XlZawPj+p76rNlnD887zCq53D+8Ki+ha4sl+lc" +
+                                                "F05TeWIOBUlYmYQcvRIBpT5GlaRuyeGyQ0DBGLdr2bALKmlnv5MrS9Ak7YwqA9SV" +
+                                                "2JVVEuMlZ/sCAnYziXGhwq4lBHQwihFRARaYS4wrawa0VxCCeXFhPVv+GCRAr936" +
+                                                "6yGbgavIzDxzZY+qBZoH1jzvjwTYUORqrJopxYGC9bxMy8rvUTYcI/Bl+k7pGa2+" +
+                                                "/GrBgveCVl9+he4fYtN7Ib2+3NlclXR2afXldaLtKWuFwvFm4d1WaVooDLGLImkA" +
+                                                "CifNozF6CuhAJhyigLmRGKWKrXUzYvg6AE2LrWvZPHiFLgcPN26NRw7Q9eUimym3" +
+                                                "LlgPv0sPyaqTMlOwHqHDCdCqGq0buqS++vBNg9aaPyayJfUIrbiZ4mYUNBb9g4/n" +
+                                                "com4lEgM1r8lCs4I9KXoLY2uFFZMgJ6UkEgP3hlIx0XTxxKM/XdAfSgakv8+JBVJ" +
+                                                "fRmZpACNBwU6yAtKPRn66EEKrb4MRaHxjLE+1L/iKhJ5pL6MzOesP4n8h+ilWl+G" +
+                                                "+vC+viIVfbhHHcW23fhrYppetHj4RNeDrkm1v3dc+SfNkBOexhd67sdjCgfJCZ8L" +
+                                                "kFDxXojDydn4casP8Lg/RP3XzOliyTU0v3gp1/ojRq5M/falHSKlD2uaPmztIahi" +
+                                                "c8H5X3iQbHkfxlvuxwX/AnYpmtz4OdX5AAAAAElFTkSuQmCC");
         return pngImageToRgbBytes(png);
     }
 
