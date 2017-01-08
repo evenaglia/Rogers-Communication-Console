@@ -79,7 +79,7 @@ public class ConPi extends ConServer {
         Con con = getCon();
         for (String id : "0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80".split(",")) {
             byte[] colorBars = getColorBars();
-            byte who = (byte)Integer.parseInt(id.substring(2, 16));
+            byte who = (byte)Integer.parseInt(id.substring(2), 16);
             con.wake(who);
             con.updateImage(who, colorBars);
         }
