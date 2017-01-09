@@ -41,7 +41,6 @@ import com.venaglia.roger.console.server.Con;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -107,7 +106,7 @@ public class ConPi extends ConServer {
         Gpio.pwmSetRange(PWM_RANGE);
         Gpio.pwmSetClock(100);
 
-        con.brightness(1000);
+        con.brightness(250);
     }
 
     @Override
