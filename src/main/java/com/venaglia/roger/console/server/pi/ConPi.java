@@ -207,6 +207,11 @@ public class ConPi extends ConServer {
                 columnPins[2].setMode(DIGITAL_INPUT);
             }
 
+            @Override
+            public void sendRaw(byte selectorByte, byte command, byte... data) throws IOException {
+                sendCommandAndData(selectorByte, command, data);
+            }
+
             private void executeCommandSequence(byte to, int... seq) throws IOException {
                 int i = 1;
                 for (int c = 0; c < seq[0]; c++) {

@@ -38,4 +38,6 @@ public interface Con {
     void updateImage(byte selectorByte, byte[] data) throws IOException;
 
     void readButtons(Consumer<Boolean> resultBuilder);
+
+    void sendRaw(byte selectorByte, byte command, byte... bytes) throws IOException;
 }

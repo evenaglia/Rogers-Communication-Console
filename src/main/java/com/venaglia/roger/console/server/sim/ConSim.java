@@ -198,6 +198,11 @@ public class ConSim extends ConServer {
                 }
             }
 
+            @Override
+            public void sendRaw(byte selectorByte, byte command, byte... bytes) throws IOException {
+                sleepUntil(currentTimeMillis() + timeFor(bytes.length));
+            }
+
             private void refreshImage(byte selectorByte) {
                 if (selectorByte == 0) {
                     return; // no-op
