@@ -89,9 +89,9 @@ public class ConSim extends ConServer {
 
             @Override
             public void hardReset() throws IOException {
-                long until = currentTimeMillis() + 750L;
+                long until = currentTimeMillis() + 1260L;
                 blankImage((byte)0xFF);
-                until += timeFor(0, 0, 160 * 128 * 3, 1, 0);
+                until += timeFor(0, 0, 3, 3, 6, 1, 3, 1, 2, 1, 0, 1, 1, 4, 4, 16, 16, 0, 0, 160 * 128 * 3);
                 sleepUntil(until);
             }
 
@@ -100,9 +100,9 @@ public class ConSim extends ConServer {
                 if (selectorByte == 0) {
                     return; // no-op
                 }
-                long until = currentTimeMillis() + 500L;
+                long until = currentTimeMillis() + 760L;
                 blankImage(selectorByte);
-                until += timeFor(0, 0, 160 * 128 * 3, 1, 0);
+                until += timeFor(0, 0, 3, 3, 6, 1, 3, 1, 2, 1, 0, 1, 1, 4, 4, 16, 16, 0, 0, 160 * 128 * 3);
                 sleepUntil(until);
             }
 

@@ -22,6 +22,7 @@ import static com.pi4j.io.gpio.PinMode.DIGITAL_OUTPUT;
 import static com.pi4j.io.gpio.PinPullResistance.PULL_UP;
 import static com.venaglia.roger.console.server.pi.PinAssignments.Buttons.*;
 import static java.lang.System.currentTimeMillis;
+import static com.venaglia.roger.console.server.pi.ST7735R.*;
 
 import com.pi4j.io.gpio.GpioController;
 import com.pi4j.io.gpio.GpioFactory;
@@ -50,19 +51,16 @@ import java.util.function.Consumer;
  */
 public class ConPi extends ConServer {
 
-    private static final byte   SOFT_RESET_COMMAND = 0x01;
-    private static final byte   SET_DISPLAY_OFF_COMMAND = 0x28;
-    private static final byte   SET_DISPLAY_ROTATION_COMMAND = 0x36;
-    private static final byte[] SET_DISPLAY_ROTATION_DATA = { 0b01100000 };
+
     private static final byte   SET_DISPLAY_CLEAR_COMMAND = 0x2C;
     private static final byte[] SET_DISPLAY_CLEAR_DATA = new byte[160 * 128 * 3];
-    private static final byte   SET_DISPLAY_ON_COMMAND = 0x29;
+
     private static final byte   SLEEP_COMMAND = 0x10;
     private static final byte   WAKE_COMMAND = 0x11;
     private static final byte   SET_COLUMN_0_COMMAND = 0x2A;
-    private static final byte[] SET_COLUMN_0_DATA = { 0, 0, 0, (byte)159 };
+    private static final byte[] SET_COLUMN_0_DATA = { 0, 0, 0, (byte)0x9F };
     private static final byte   SET_ROW_0_COMMAND = 0x2B;
-    private static final byte[] SET_ROW_0_DATA = { 0, 0, 0, 127 };
+    private static final byte[] SET_ROW_0_DATA = { 0, 0, 0, 0x7F };
     private static final byte MEMORY_WRITE_COMMAND = 0x2C;
 
     private final GpioPinDigitalOutput reset;
@@ -140,7 +138,7 @@ public class ConPi extends ConServer {
                     return; // no-op
                 }
                 sendCommandAndData(selectorByte, WAKE_COMMAND);
-                sleepUntil(currentTimeMillis() + 250L);
+                sleepUntil(currentTimeMillis() + 500L);
             }
 
             @Override
@@ -149,35 +147,26 @@ public class ConPi extends ConServer {
                     return; // no-op
                 }
                 sendCommandAndData(selectorByte, SLEEP_COMMAND);
-                sleepUntil(currentTimeMillis() + 250L);
+                sleepUntil(currentTimeMillis() + 500L);
             }
 
             public void initializeConLcd(byte selectorByte) throws IOException {
                 if (selectorByte == 0) {
                     return; // no-op
                 }
-                sendCommandAndData(selectorByte, WAKE_COMMAND);
-                sleepUntil(currentTimeMillis() + 250L);
-                sendCommandAndData(selectorByte, SET_DISPLAY_OFF_COMMAND);
+                executeCommandSequence(selectorByte, INIT_SEQ);
                 sendCommandAndData(selectorByte, SET_DISPLAY_CLEAR_COMMAND, SET_DISPLAY_CLEAR_DATA);
-                sendCommandAndData(selectorByte, SET_DISPLAY_ROTATION_COMMAND, SET_DISPLAY_ROTATION_DATA);
-                sendCommandAndData(selectorByte, SET_DISPLAY_ON_COMMAND);
             }
 
             @Override
             public void softReset(byte selectorByte) throws IOException {
-                if (selectorByte == 0) {
-                    return; // no-op
-                }
-                sendCommandAndData(selectorByte, SOFT_RESET_COMMAND);
-                sleepUntil(currentTimeMillis() + 250L);
                 initializeConLcd(selectorByte);
             }
 
             @Override
             public void hardReset() throws IOException {
-                reset.pulse(300, PinState.LOW, false);
-                sleepUntil(currentTimeMillis() + 500L);
+                reset.pulse(300, PinState.LOW, true);
+                sleepUntil(currentTimeMillis() + 200L);
                 initializeConLcd((byte)0xFF);
             }
 
@@ -216,6 +205,23 @@ public class ConPi extends ConServer {
                 buttonStateConsumer.accept(rowPins[2].getState() == PinState.LOW);
                 buttonStateConsumer.accept(rowPins[3].getState() == PinState.LOW);
                 columnPins[2].setMode(DIGITAL_INPUT);
+            }
+
+            private void executeCommandSequence(byte to, int... seq) throws IOException {
+                int i = 1;
+                for (int c = 0; c < seq[0]; c++) {
+                    byte command = (byte)seq[i++];
+                    boolean delay = (seq[i] & DELAY) != 0;
+                    int dataBytes = seq[i++] & 0xFFFF;
+                    byte[] data = new byte[dataBytes];
+                    for (int j = 0; j < dataBytes; j++) {
+                        data[j] = (byte)seq[i++];
+                    }
+                    sendCommandAndData(to, command, data);
+                    if (delay) {
+                        sleepUntil(currentTimeMillis() + seq[i++]);
+                    }
+                }
             }
 
             private void sendCommandAndData(byte to, int command, byte... data) throws IOException {
