@@ -55,6 +55,7 @@ import java.util.regex.Pattern;
 public abstract class ConServer implements Runnable {
 
     private static final Pattern MATCH_LCD_SELECTOR = Pattern.compile("^0x([0-9a-f][0-9a-f])$");
+    private static final Pattern MATCH_LCD_COMMAND_DATA = Pattern.compile("^(?:0x([0-9a-f][0-9a-f]))((?: 0x[0-9a-f][0-9a-f]|0|[1-9][0-9]?|2[0-4][0-9]|25[0-5]){1,63})$");
     private static final Pattern MATCH_LCD_RESET_SELECTOR = Pattern.compile("^(?:0x([0-9a-f][0-9a-f])|hard)$");
     private static final Pattern MATCH_LCD_BRIGHTNESS = Pattern.compile("^(0|[1-9][0-9]{0,2}|1000)$");
     private static final Pattern MATCH_IMAGE_NAME = Pattern.compile("^(\\w+)$");
@@ -255,6 +256,7 @@ public abstract class ConServer implements Runnable {
         Pattern pattern;
         String argName;
         boolean parseSelector = true;
+        int argCount = 2;
         switch (args.get(0)) {
             case "reset":
                 pattern = MATCH_LCD_RESET_SELECTOR;
@@ -273,10 +275,15 @@ public abstract class ConServer implements Runnable {
                 pattern = MATCH_LCD_SELECTOR;
                 argName = "selector";
                 break;
+            case "cmd":
+                pattern = MATCH_LCD_COMMAND_DATA;
+                argName = "command/data string";
+                argCount = -1; // any number of args is OK
+                break;
             default:
                 throw new IllegalArgumentException("unrecognized sub-command \"" + args.get(0) + "\"");
         }
-        if (args.size() != 2) {
+        if (argCount >= 0 && args.size() != argCount) {
             throw new IllegalArgumentException("bad args for \"lcd " + args.get(0) + "\"");
         }
         Matcher matcher = pattern.matcher(args.get(1));
@@ -286,7 +293,7 @@ public abstract class ConServer implements Runnable {
         String selector = null;
         byte selectorByte = 0;
         if (parseSelector) {
-            selector = args.get(1);
+            selector = matcher.group(1);
             if ("hard".equals(selector)) {
                 selectorByte = (byte)0xFF;
             } else if ("0x00".equals(selector)) {
@@ -311,6 +318,22 @@ public abstract class ConServer implements Runnable {
                 break;
             case "brightness":
                 con.brightness(Integer.parseInt(matcher.group(1)));
+                break;
+            case "cmd":
+                String[] parts = matcher.group(2).split(" ");
+                byte command = 0x00;
+                byte[] data = new byte[parts.length - 1];
+                for (int i = 0; i < parts.length; i++) {
+                    byte b = parts[i].length() > 2 && parts[i].charAt(1) == 'x'
+                        ? (byte)Integer.parseInt(parts[i].substring(2), 16)
+                        : (byte)Integer.parseInt(parts[i], 10);
+                    if (i == 0) {
+                        command = b;
+                    } else {
+                        data[i - 1] = b;
+                    }
+                }
+                con.sendRaw(selectorByte, command, data);
                 break;
         }
         return "ok";
