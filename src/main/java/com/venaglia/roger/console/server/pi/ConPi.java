@@ -230,7 +230,7 @@ public class ConPi extends ConServer {
             }
 
             private void sendCommandAndData(byte to, int command, byte... data) throws IOException {
-                commandStream.load(to, buffers.get(0));
+                commandStream.load((byte)(~to & 0xFF), buffers.get(0));
                 txd(SpiChannel.CS0, commandStream);
                 commandStream.load((byte)command, data);
                 txd(SpiChannel.CS1, commandStream);

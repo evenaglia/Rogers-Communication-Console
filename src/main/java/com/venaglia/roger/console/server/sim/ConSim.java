@@ -85,6 +85,8 @@ public class ConSim extends ConServer {
 
             private int brightnessValue = 0;
             private float brightness = 0.0f;
+            private float brightnessScale = 0.0f;
+            private float brightnessBase = 0.0f;
             private boolean[] sleeping = new boolean[8];
 
             @Override
@@ -109,8 +111,10 @@ public class ConSim extends ConServer {
             @Override
             public void brightness(int value) throws IOException {
                 if (brightnessValue != value) {
-                    brightnessValue = value;
+                    brightnessValue = Math.min(PWM_RANGE, Math.max(0, value));
                     brightness = value / pwmRange;
+                    brightnessBase = brightness * brightness * 0.75f;
+                    brightnessScale = Math.min(1.0f - brightnessBase, brightness * 2.25f + 0.075f);
                     refreshImage((byte)0xFF);
                 }
             }
@@ -164,8 +168,8 @@ public class ConSim extends ConServer {
                 long until = currentTimeMillis() + 250L;
                 byte[] d = data.clone();
                 executor.execute(() -> {
-                    float scale = brightness * 0.93f + 0.02f;
-                    float base = brightness * 0.05f;
+                    float scale = this.brightnessScale;
+                    float base = this.brightnessBase;
                     byte update = 0;
                     for (int i = 0, m = 1; i < 8; i++, m <<= 1) {
                         if ((selectorByte & m) != 0 && !sleeping[i]) {
@@ -200,7 +204,21 @@ public class ConSim extends ConServer {
 
             @Override
             public void sendRaw(byte selectorByte, byte command, byte... bytes) throws IOException {
+                StringBuilder buffer = new StringBuilder(11 + 5 * bytes.length);
+                buffer.append("[CS0] 0x").append(toHex((byte)(~selectorByte & 0xFF))).append("\n");
+                buffer.append("[CS1] 0x").append(toHex(command));
+                for (byte b : bytes) {
+                    buffer.append(" 0x").append(toHex(b));
+                }
+                System.out.println(buffer);
                 sleepUntil(currentTimeMillis() + timeFor(bytes.length));
+            }
+
+            private char[] toHex(byte selectorByte) {
+                return new char[]{
+                        "0123456789abcdef".charAt(selectorByte >> 4 & 0x0F),
+                        "0123456789abcdef".charAt(selectorByte & 0x0F)
+                };
             }
 
             private void refreshImage(byte selectorByte) {
@@ -208,8 +226,8 @@ public class ConSim extends ConServer {
                     return; // no-op
                 }
                 executor.execute(() -> {
-                    float scale = brightness * 0.93f + 0.02f;
-                    float base = brightness * 0.05f;
+                    float scale = this.brightnessScale;
+                    float base = this.brightnessBase;
                     for (int i = 0, m = 1; i < 8; i++, m <<= 1) {
                         if ((selectorByte & m) != 0 && !sleeping[i]) {
                             byte[] data = last[i];
@@ -227,7 +245,7 @@ public class ConSim extends ConServer {
                     return; // no-op
                 }
                 executor.execute(() -> {
-                    byte base = (byte)((int)(brightness * 0.05f * 0xFF) & 0xFF);
+                    byte base = (byte)((int)(brightnessBase * 0xFF) & 0xFF);
                     Arrays.fill(buffer, base);
                     for (int i = 0, m = 1; i < 8; i++, m <<= 1) {
                         if ((selectorByte & m) != 0) {

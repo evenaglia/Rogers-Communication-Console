@@ -54,10 +54,10 @@ import java.util.regex.Pattern;
  */
 public abstract class ConServer implements Runnable {
 
-    private static final Pattern MATCH_LCD_SELECTOR = Pattern.compile("^0x([0-9a-f][0-9a-f])$");
-    private static final Pattern MATCH_LCD_COMMAND_DATA = Pattern.compile("^(?:0x([0-9a-f][0-9a-f]))((?: 0x[0-9a-f][0-9a-f]|0|[1-9][0-9]?|2[0-4][0-9]|25[0-5]){1,63})$");
-    private static final Pattern MATCH_LCD_RESET_SELECTOR = Pattern.compile("^(?:0x([0-9a-f][0-9a-f])|hard)$");
-    private static final Pattern MATCH_LCD_BRIGHTNESS = Pattern.compile("^(0|[1-9][0-9]{0,2}|1000)$");
+    private static final Pattern[] MATCH_LCD_SELECTOR = { Pattern.compile("^(0x[0-9a-f][0-9a-f])$") };
+    private static final Pattern[] MATCH_LCD_RESET_SELECTOR = { Pattern.compile("^(0x[0-9a-f][0-9a-f]|hard)$") };
+    private static final Pattern[] MATCH_LCD_BRIGHTNESS = { Pattern.compile("^(0|[1-9][0-9]{0,2}|1000)$") };
+    private static final Pattern MATCH_LCD_COMMAND_DATA = Pattern.compile("^(0x[0-9a-f][0-9a-f]|0|[1-9][0-9]?|2[0-4][0-9]|25[0-5])$");
     private static final Pattern MATCH_IMAGE_NAME = Pattern.compile("^(\\w+)$");
     private static final Pattern MATCH_IMAGE_NAME_OR_BUILT_IN = Pattern.compile("^(@color-bars|@checkerboard|@aspect-ratio-grid|\\w+)$");
     private static final Pattern MATCH_IMAGE_NAME_OR_ALL = Pattern.compile("^(\\*|\\w+)$");
@@ -67,11 +67,12 @@ public abstract class ConServer implements Runnable {
     };
     private static final Pattern[] MATCH_IMAGE_SHOW_ARGS = {
             MATCH_IMAGE_NAME_OR_BUILT_IN,
-            MATCH_LCD_SELECTOR
+            MATCH_LCD_SELECTOR[0]
     };
     private static final Pattern[] MATCH_IMAGE_CLEAR_ARGS = {
             MATCH_IMAGE_NAME_OR_ALL
     };
+    private static final String[] LCD_SELECTOR_ARG_NAMES = { "selector" };
     private static final String[] IMAGE_STORE_ARG_NAMES = { "image name", "image data" };
     private static final String[] IMAGE_SHOW_ARG_NAMES = { "image name", "selector" };
     private static final String[] IMAGE_CLEAR_ARG_NAMES = { "image name" };
@@ -129,8 +130,7 @@ public abstract class ConServer implements Runnable {
                                 break;
                             case "auth":
                                 if (expectAuth == null) {
-                                    response =
-                                            "err must send \"hello\" command immediately before sending \"auth\" command";
+                                    response = "err must send \"hello\" command immediately before sending \"auth\" command";
                                 } else if (secret == null) {
                                     response = "auth-success";
                                 } else {
@@ -173,8 +173,14 @@ public abstract class ConServer implements Runnable {
                                 break;
                         }
                     } catch (Exception e) {
-                        response = "err " + e.getMessage();
+                        String message = e.getMessage();
+                        response = message == null ? "err" : "err " + message;
                         expectAuth = null;
+                        e.printStackTrace();
+                    } finally {
+                        if (!"hello".equals(command[0])) {
+                            expectAuth = null;
+                        }
                     }
                     out.println(response);
                     out.flush();
@@ -253,51 +259,63 @@ public abstract class ConServer implements Runnable {
         if (args.size() < 1) {
             throw new IllegalArgumentException("missing sub-command for \"lcd\"");
         }
-        Pattern pattern;
-        String argName;
+        Pattern[] patterns;
+        String[] argNames;
         boolean parseSelector = true;
         int argCount = 2;
         switch (args.get(0)) {
             case "reset":
-                pattern = MATCH_LCD_RESET_SELECTOR;
-                argName = "selector";
+                patterns = MATCH_LCD_RESET_SELECTOR;
+                argNames = LCD_SELECTOR_ARG_NAMES;
                 break;
             case "brightness":
-                pattern = MATCH_LCD_BRIGHTNESS;
-                argName = "brightness";
+                patterns = MATCH_LCD_BRIGHTNESS;
+                argNames = new String[]{ "brightness" };
                 parseSelector = false;
                 break;
             case "sleep":
-                pattern = MATCH_LCD_SELECTOR;
-                argName = "selector";
+                patterns = MATCH_LCD_SELECTOR;
+                argNames = LCD_SELECTOR_ARG_NAMES;
                 break;
             case "wake":
-                pattern = MATCH_LCD_SELECTOR;
-                argName = "selector";
+                patterns = MATCH_LCD_SELECTOR;
+                argNames = LCD_SELECTOR_ARG_NAMES;
                 break;
             case "cmd":
-                pattern = MATCH_LCD_COMMAND_DATA;
-                argName = "command/data string";
-                argCount = -1; // any number of args is OK
+                patterns = new Pattern[Math.max(args.size() - 1, 2)];
+                Arrays.fill(patterns, MATCH_LCD_COMMAND_DATA);
+                patterns[0] = MATCH_LCD_SELECTOR[0];
+                argNames = new String[patterns.length];
+                argNames[0] = LCD_SELECTOR_ARG_NAMES[0];
+                argNames[1] = "command";
+                for (int i = 2; i < argNames.length; i++) {
+                    argNames[i] = "data[" + (i-2) + "]";
+                }
                 break;
             default:
                 throw new IllegalArgumentException("unrecognized sub-command \"" + args.get(0) + "\"");
         }
-        if (argCount >= 0 && args.size() != argCount) {
-            throw new IllegalArgumentException("bad args for \"lcd " + args.get(0) + "\"");
+        if (args.size() != patterns.length + 1) {
+            throw new IllegalArgumentException("bad args for \"image " + args.get(0) + "\"");
         }
-        Matcher matcher = pattern.matcher(args.get(1));
-        if (!matcher.find()) {
-            throw new IllegalArgumentException("bad " + argName + " for \"lcd " + args.get(0) + "\": " + args.get(1));
+        Matcher[] matchers = new Matcher[patterns.length];
+        for (int i = 0, l = patterns.length; i < l; i++) {
+            Matcher matcher = patterns[i].matcher(args.get(i + 1));
+            if (!matcher.find()) {
+                throw new IllegalArgumentException("bad " + argNames[i] + " for \"image " + args.get(0) + "\": " + args.get(i + 1));
+            }
+            matchers[i] = matcher;
         }
         String selector = null;
         byte selectorByte = 0;
         if (parseSelector) {
-            selector = matcher.group(1);
+            selector = matchers[0].group(1);
             if ("hard".equals(selector)) {
                 selectorByte = (byte)0xFF;
             } else if ("0x00".equals(selector)) {
                 return "ok";
+            } else if (selector == null) {
+                throw new IllegalArgumentException("missing selector");
             } else {
                 selectorByte = (byte)Integer.parseInt(selector.substring(2), 16);
             }
@@ -317,20 +335,20 @@ public abstract class ConServer implements Runnable {
                 con.wake(selectorByte);
                 break;
             case "brightness":
-                con.brightness(Integer.parseInt(matcher.group(1)));
+                con.brightness(Integer.parseInt(matchers[0].group(1)));
                 break;
             case "cmd":
-                String[] parts = matcher.group(2).split(" ");
                 byte command = 0x00;
-                byte[] data = new byte[parts.length - 1];
-                for (int i = 0; i < parts.length; i++) {
-                    byte b = parts[i].length() > 2 && parts[i].charAt(1) == 'x'
-                        ? (byte)Integer.parseInt(parts[i].substring(2), 16)
-                        : (byte)Integer.parseInt(parts[i], 10);
-                    if (i == 0) {
+                byte[] data = new byte[matchers.length - 2];
+                for (int i = 1; i < matchers.length; i++) {
+                    String part = matchers[i].group();
+                    byte b = part.length() > 2 && part.charAt(1) == 'x'
+                        ? (byte)Integer.parseInt(part.substring(2), 16)
+                        : (byte)Integer.parseInt(part, 10);
+                    if (i == 1) {
                         command = b;
                     } else {
-                        data[i - 1] = b;
+                        data[i - 2] = b;
                     }
                 }
                 con.sendRaw(selectorByte, command, data);
