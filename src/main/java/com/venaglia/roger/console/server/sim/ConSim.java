@@ -203,6 +203,11 @@ public class ConSim extends ConServer {
             }
 
             @Override
+            public void markButtons(Iterable<Boolean> buttons) {
+                simulatedButtons.showButtonState(buttons);
+            }
+
+            @Override
             public void sendRaw(byte selectorByte, byte command, byte... bytes) throws IOException {
                 StringBuilder buffer = new StringBuilder(11 + 5 * bytes.length);
                 buffer.append("[CS0] 0x").append(toHex((byte)(~selectorByte & 0xFF))).append("\n");

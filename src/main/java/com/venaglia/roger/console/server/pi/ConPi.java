@@ -208,6 +208,11 @@ public class ConPi extends ConServer {
             }
 
             @Override
+            public void markButtons(Iterable<Boolean> buttons) {
+                // no-op
+            }
+
+            @Override
             public void sendRaw(byte selectorByte, byte command, byte... data) throws IOException {
                 sendCommandAndData(selectorByte, command, data);
             }

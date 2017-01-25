@@ -20,9 +20,13 @@ package com.venaglia.roger.console.server;
 import static java.lang.System.currentTimeMillis;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import com.venaglia.roger.console.server.impl.ButtonDownSupplier;
+import com.venaglia.roger.console.server.impl.DelegatedCommand;
 import com.venaglia.roger.console.server.pi.ConPi;
 import com.venaglia.roger.console.server.sim.ConSim;
 import com.venaglia.roger.console.server.sim.SimulatedButtons;
+import com.venaglia.roger.ui.Command;
+import com.venaglia.roger.ui.impl.ConClient;
 import com.venaglia.roger.ui.impl.Sha256;
 
 import javax.imageio.ImageIO;
@@ -35,9 +39,13 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketAddress;
 import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
@@ -45,6 +53,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -72,6 +81,8 @@ public abstract class ConServer implements Runnable {
     private static final Pattern[] MATCH_IMAGE_CLEAR_ARGS = {
             MATCH_IMAGE_NAME_OR_ALL
     };
+    private static final Pattern MATCH_OK = Pattern.compile("^ok.*$");
+    private static final Pattern MATCH_DOWN = Pattern.compile("^down [x-]*$");
     private static final String[] LCD_SELECTOR_ARG_NAMES = { "selector" };
     private static final String[] IMAGE_STORE_ARG_NAMES = { "image name", "image data" };
     private static final String[] IMAGE_SHOW_ARG_NAMES = { "image name", "selector" };
@@ -81,6 +92,8 @@ public abstract class ConServer implements Runnable {
 
     private final byte[] secret;
     private final Cache<String,byte[]> imageDataCache;
+    private final ConClient delegate;
+    private final ButtonDownSupplier buttonDownSupplier;
 
     private Con con;
     private ServerSocket serverSocket;
@@ -93,7 +106,17 @@ public abstract class ConServer implements Runnable {
         this.imageDataCache = new Cache<>(256);
         if (secret == null) {
             System.err.println("Console service is insecure! No secret has been set to protect it from unauthorized access.");
+        } else if (secret.length < 4) {
+            System.err.println("The provided secret is too short. It will not work!");
         }
+        SocketAddress delegateAddress = getDelegate();
+        if (delegateAddress != null) {
+            BlockingQueue<Command> delegateQueue = new ArrayBlockingQueue<>(4, false);
+            delegate = new ConClient(delegateAddress, secret, delegateQueue, delegateQueue::offer);
+        } else {
+            delegate = null;
+        }
+        buttonDownSupplier = new ButtonDownSupplier(12);
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
@@ -139,25 +162,49 @@ public abstract class ConServer implements Runnable {
                                 }
                                 break;
                             case "ping":
-                                response = "pong" + rawCommand.substring(4);
+                                if (delegate != null) {
+                                    response = delegate.sendCommand(new DelegatedCommand(command[0], args(rawCommand.substring(4)), Pattern.compile("^pong.*$"))).get();
+                                } else {
+                                    response = "pong" + rawCommand.substring(4);
+                                }
                                 break;
                             case "image":
                                 checkAuth("image", auth);
-                                response = image(args(rawCommand.substring(5)));
+                                if (delegate != null) {
+                                    List<String> argList = args(rawCommand.substring(3));
+                                    response = delegate.sendCommand(new DelegatedCommand(command[0], argList, MATCH_OK)).get();
+                                    image(argList);
+                                } else {
+                                    response = image(args(rawCommand.substring(5)));
+                                }
                                 break;
                             case "lcd":
                                 checkAuth("lcd", auth);
-                                response = lcd(args(rawCommand.substring(3)));
+                                if (delegate != null) {
+                                    List<String> argList = args(rawCommand.substring(3));
+                                    response = delegate.sendCommand(new DelegatedCommand(command[0], argList, MATCH_OK)).get();
+                                    lcd(argList);
+                                } else {
+                                    response = lcd(args(rawCommand.substring(3)));
+                                }
                                 break;
                             case "scan":
                                 checkAuth("scan", auth);
-                                response = scan();
+                                if (delegate != null) {
+                                    response = delegate.sendCommand(new DelegatedCommand(command[0], Collections.emptyList(), MATCH_DOWN)).get();
+                                } else {
+                                    response = scan();
+                                }
+                                con.markButtons(parseButtons(response));
                                 break;
                             case "test":
                                 if (secret == null) {
                                     socket.setSoTimeout(300000);
                                 }
                                 checkAuth("test", auth);
+                                if (delegate != null) {
+                                    response = delegate.sendCommand(new DelegatedCommand(command[0], Collections.emptyList(), MATCH_OK)).get();
+                                }
                                 lcd(Arrays.asList("reset", "hard"));
                                 lcd(Arrays.asList("wake", "0xff"));
                                 lcd(Arrays.asList("brightness", "1000"));
@@ -173,6 +220,9 @@ public abstract class ConServer implements Runnable {
                                 break;
                         }
                     } catch (Exception e) {
+                        if (e instanceof ExecutionException && e.getCause() instanceof Exception) {
+                            e = (Exception)e.getCause();
+                        }
                         String message = e.getMessage();
                         response = message == null ? "err" : "err " + message;
                         expectAuth = null;
@@ -193,6 +243,13 @@ public abstract class ConServer implements Runnable {
                 running = false;
             }
         }
+    }
+
+    private Iterable<Boolean> parseButtons(String down) {
+        for (int i = 0, j = 5, l = Math.min(down.length() - 5, buttonDownSupplier.size()); i < l; i++, j++) {
+            buttonDownSupplier.set(i, Character.isLetterOrDigit(down.charAt(j)));
+        }
+        return buttonDownSupplier;
     }
 
     protected synchronized Supplier<Socket> getSocketSupplier() throws IOException {
@@ -262,7 +319,6 @@ public abstract class ConServer implements Runnable {
         Pattern[] patterns;
         String[] argNames;
         boolean parseSelector = true;
-        int argCount = 2;
         switch (args.get(0)) {
             case "reset":
                 patterns = MATCH_LCD_RESET_SELECTOR;
@@ -565,6 +621,25 @@ public abstract class ConServer implements Runnable {
             return Integer.parseInt(System.getProperty("con.network.idle.timeout", "2500"));
         } catch (NumberFormatException e) {
             return 2500;
+        }
+    }
+
+    public SocketAddress getDelegate() {
+        try {
+            String host = System.getProperty("con.network.delegate");
+            if (host != null) {
+                int port = 65432;
+                int colon;
+                if ((colon = host.indexOf(":")) < 0) {
+                    port = Integer.parseInt(host.substring(colon));
+                }
+                return new InetSocketAddress(InetAddress.getByName(host), port);
+            } else {
+                return null;
+            }
+        } catch (NumberFormatException | UnknownHostException e) {
+            e.printStackTrace();
+            return null;
         }
     }
 

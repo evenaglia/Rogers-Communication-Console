@@ -102,6 +102,14 @@ public class SimulatedButtons extends JComponent {
         return buttonStateIterator;
     }
 
+    public void showButtonState(Iterable<Boolean> states) {
+        int i = 0;
+        for (Iterator<Boolean> iterator = states.iterator(); i < buttons.length && iterator.hasNext(); i++) {
+            buttons[i].getButtonStateHighlighter().accept(iterator.next());
+        }
+        repaint();
+    }
+
     public void setImageBytesRgb(byte selectorByte, byte[] imageDateRgb) {
         for (int i = 0, m = 1; i < buttons.length; i++, m <<= 1) {
             if ((selectorByte & m) != 0) {

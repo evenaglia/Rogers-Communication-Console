@@ -110,6 +110,10 @@ public class VirtualButton extends JComponent {
         return buttonState;
     }
 
+    public Consumer<Boolean> getButtonStateHighlighter() {
+        return buttonState;
+    }
+
     public void setImageBytesRgb(byte[] imageBytesRgb) {
         assert imageBytesRgb != null;
         assert imageBytesRgb.length == 160 * 128 * 3;
@@ -138,6 +142,8 @@ public class VirtualButton extends JComponent {
     public void paint(Graphics graphics) {
         super.paint(graphics);
         Graphics2D g = (Graphics2D)graphics;
+        g.setColor(buttonState.get() ? Color.LIGHT_GRAY : Color.BLACK);
+        g.fillRect(0, 0, getWidth() - 1, getHeight() - 1);
         g.setColor(Color.RED);
         g.drawRect(0, 0, getWidth() - 1, getHeight() - 1);
         if (buttonClass.isHardButton()) {

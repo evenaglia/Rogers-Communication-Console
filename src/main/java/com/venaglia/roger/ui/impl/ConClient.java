@@ -17,7 +17,7 @@
 
 package com.venaglia.roger.ui.impl;
 
-import static com.google.common.base.Charsets.UTF_8;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.venaglia.roger.ui.Command;
 
@@ -54,7 +54,7 @@ public class ConClient implements Runnable {
                      BlockingQueue<Command> queue,
                      Consumer<Command> queueIn) {
         assert addr != null;
-        assert secret != null && secret.length > 4;
+        assert secret == null || secret.length > 4;
         assert queue != null;
         assert queueIn != null;
         this.addr = addr;
@@ -142,9 +142,10 @@ public class ConClient implements Runnable {
 
     // public API
 
-    public void sendCommand(Command command) {
+    public <C extends Command> C sendCommand(C command) {
         if (!queue.offer(command)) {
             throw new RuntimeException("Queue is full, unable to update the display");
         }
+        return command;
     }
 }
