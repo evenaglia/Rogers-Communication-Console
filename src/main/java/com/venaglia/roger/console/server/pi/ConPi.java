@@ -155,6 +155,8 @@ public class ConPi extends ConServer {
                     return; // no-op
                 }
                 executeCommandSequence(selectorByte, INIT_SEQ);
+                sendCommandAndData(selectorByte, SET_COLUMN_0_COMMAND, SET_COLUMN_0_DATA);
+                sendCommandAndData(selectorByte, SET_ROW_0_COMMAND, SET_ROW_0_DATA);
                 sendCommandAndData(selectorByte, SET_DISPLAY_CLEAR_COMMAND, SET_DISPLAY_CLEAR_DATA);
             }
 

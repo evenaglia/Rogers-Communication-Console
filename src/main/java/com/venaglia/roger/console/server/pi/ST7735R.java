@@ -136,7 +136,7 @@ public interface ST7735R {
                 0x08,                   //     18-bit color
               ST7735_CASET  , 4      ,  // 16: Column addr set, 4 args, no delay:
                 0x00, 0x00,             //     XSTART = 0
-                0x00, 0x7F,             //     XEND = 127
+                0x00, 0x9F,             //     XEND = 159
               ST7735_RASET  , 4      ,  // 17: Row addr set, 4 args, no delay:
                 0x00, 0x00,             //     XSTART = 0
                 0x00, 0x7F,             //     XEND = 127
