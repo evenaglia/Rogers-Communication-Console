@@ -129,11 +129,11 @@ public interface ST7735R {
                 0x0E,
               ST7735_INVOFF , 0      ,  // 13: Don't invert display, no args, no delay
               ST7735_MADCTL , 1      ,  // 14: Memory access control (directions), 1 arg:
-    //            0xC8,                   //     row addr/col addr, bottom to top refresh
-                0xA8,                   // rotate display counter-clockwise
+                0xC8,                   //     row addr/col addr, bottom to top refresh
+//                0xA8,                   // rotate display counter-clockwise
               ST7735_COLMOD , 1      ,  // 15: set color mode, 1 arg, no delay:
-    //            0x05,                   //     16-bit color
-                0x08,                   //     18-bit color
+                0x05,                   //     16-bit color
+//                0x08,                   //     18-bit color
               ST7735_CASET  , 4      ,  // 16: Column addr set, 4 args, no delay:
                 0x00, 0x00,             //     XSTART = 0
                 0x00, 0x9F,             //     XEND = 159
