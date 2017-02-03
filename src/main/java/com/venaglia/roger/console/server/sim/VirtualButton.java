@@ -143,9 +143,9 @@ public class VirtualButton extends JComponent {
                             int value = (imageBytesRgb[i++] & 0xFF) << 8 |
                                         (imageBytesRgb[i++] & 0xFF);
                             int rgb = 0xFF000000 |
-                                      (value & 0xF800) << 8 |
+                                      (value & 0xF800) >> 8 |
                                       (value & 0x07E0) << 5 |
-                                      (value & 0x001F) << 3;
+                                      (value & 0x001F) << 19;
                             altImage.setRGB(x, y, rgb);
                         }
                     }

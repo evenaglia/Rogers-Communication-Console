@@ -37,12 +37,12 @@ public class ImageSerializer565 implements ImageSerializer {
     public ImageSerializer565() {
         int[] lut85 = LUTils.genLUT(8, 5);
         int[] lut86 = LUTils.genLUT(8, 6);
-        lutR = LUTils.shiftLUT(11, lut85);
+        lutR = lut85;
         lutG = LUTils.shiftLUT(5, lut86);
-        lutB = lut85;
-        assert LUTils.orLUT(lutR) == 0xF800;
+        lutB = LUTils.shiftLUT(11, lut85);
+        assert LUTils.orLUT(lutR) == 0x001F;
         assert LUTils.orLUT(lutG) == 0x07E0;
-        assert LUTils.orLUT(lutB) == 0x001F;
+        assert LUTils.orLUT(lutB) == 0xF800;
     }
 
     @Override
