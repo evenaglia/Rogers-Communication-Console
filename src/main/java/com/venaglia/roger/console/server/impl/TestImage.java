@@ -387,7 +387,7 @@ public class TestImage {
         );
     }
 
-    private static final FontLoader FONT_LOADER = new FontLoader();
+//    private static final FontLoader FONT_LOADER = new FontLoader();
 
     public static TestImage getNumber(int num) throws IOException {
         assert num >= 0 && num < 8;
@@ -442,7 +442,7 @@ public class TestImage {
         g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g.setRenderingHint(RenderingHints.KEY_ALPHA_INTERPOLATION, RenderingHints.VALUE_ALPHA_INTERPOLATION_QUALITY);
         g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
-        g.setFont(FONT_LOADER.get().deriveFont(18.0f * 3));
+        g.setFont(getLightFont().deriveFont(18.0f * 3));
         Rectangle2D bounds = g.getFontMetrics().getStringBounds(label, g);
         float w = (float)bounds.getWidth();
         g.setColor(Color.WHITE);
@@ -474,6 +474,17 @@ public class TestImage {
     }
 
     private static Font font;
+
+    private static Font getLightFont() {
+        if (font == null) {
+            try {
+                font = Font.createFont(Font.TRUETYPE_FONT, TestImage.class.getClassLoader().getResourceAsStream("WorkSans-Light.ttf"));
+            } catch (FontFormatException | IOException e) {
+                throw new RuntimeException(e.getMessage(), e);
+            }
+        }
+        return font;
+    }
 
     private static Font getHeavyFont() {
         if (font == null) {
