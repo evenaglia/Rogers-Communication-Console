@@ -25,6 +25,7 @@ import com.venaglia.roger.buttons.ButtonSet;
 import com.venaglia.roger.bundle.AbstractLoader;
 
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -48,7 +49,7 @@ public class MenuTreeLoader extends AbstractLoader<MenuTree> {
     }
 
     protected MenuTree load() {
-        String[] lines = readLines(new InputStreamReader(getStream(source)));
+        String[] lines = readLines(new InputStreamReader(getStream(source), StandardCharsets.UTF_8));
         MenuItem top = parseMenuItem(MenuTree.TOP, lines, new AtomicInteger());
         return new MenuTree() {
 

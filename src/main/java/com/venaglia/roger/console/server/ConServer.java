@@ -22,17 +22,20 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.venaglia.roger.console.server.impl.ButtonDownSupplier;
 import com.venaglia.roger.console.server.impl.DelegatedCommand;
+import com.venaglia.roger.console.server.impl.TestImage;
 import com.venaglia.roger.console.server.pi.ConPi;
 import com.venaglia.roger.console.server.sim.ConSim;
 import com.venaglia.roger.console.server.sim.SimulatedButtons;
 import com.venaglia.roger.ui.Command;
+import com.venaglia.roger.ui.ImageSerializer;
 import com.venaglia.roger.ui.impl.ConClient;
+import com.venaglia.roger.ui.impl.ImageSerializer444;
+import com.venaglia.roger.ui.impl.ImageSerializer565;
+import com.venaglia.roger.ui.impl.ImageSerializer888;
 import com.venaglia.roger.ui.impl.Sha256;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
+import java.awt.*;
 import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
@@ -54,6 +57,7 @@ import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -68,7 +72,7 @@ public abstract class ConServer implements Runnable {
     private static final Pattern[] MATCH_LCD_BRIGHTNESS = { Pattern.compile("^(0|[1-9][0-9]{0,2}|1000)$") };
     private static final Pattern MATCH_LCD_COMMAND_DATA = Pattern.compile("^(0x[0-9a-f][0-9a-f]|0|[1-9][0-9]?|2[0-4][0-9]|25[0-5])$");
     private static final Pattern MATCH_IMAGE_NAME = Pattern.compile("^(\\w+)$");
-    private static final Pattern MATCH_IMAGE_NAME_OR_BUILT_IN = Pattern.compile("^(@color-bars|@checkerboard|@aspect-ratio-grid|\\w+)$");
+    private static final Pattern MATCH_IMAGE_NAME_OR_BUILT_IN = Pattern.compile("^(@black|@white|@color-bars|@checkerboard|@aspect-ratio-grid|@skin-tones|@number-[0-7]|\\w+)$");
     private static final Pattern MATCH_IMAGE_NAME_OR_ALL = Pattern.compile("^(\\*|\\w+)$");
     private static final Pattern[] MATCH_IMAGE_STORE_ARGS = {
             MATCH_IMAGE_NAME,
@@ -89,6 +93,9 @@ public abstract class ConServer implements Runnable {
     private static final String[] IMAGE_CLEAR_ARG_NAMES = { "image name" };
 
     protected static final int PWM_RANGE = 1000;
+//    protected static final ImageSerializer IMAGE_SERIALIZER = new ImageSerializer888();
+    protected static final ImageSerializer IMAGE_SERIALIZER = new ImageSerializer565();
+//    protected static final ImageSerializer IMAGE_SERIALIZER = new ImageSerializer444();
 
     private final byte[] secret;
     private final Cache<String,byte[]> imageDataCache;
@@ -161,6 +168,12 @@ public abstract class ConServer implements Runnable {
                                     response = auth ? "auth-success" : "err auth challenge response did not match";
                                 }
                                 break;
+                            case "help":
+                                if (secret == null) {
+                                    socket.setSoTimeout(300000);
+                                }
+                                response = help(args(rawCommand.substring(4)), auth);
+                                break;
                             case "ping":
                                 if (delegate != null) {
                                     response = delegate.sendCommand(new DelegatedCommand(command[0], args(rawCommand.substring(4)), Pattern.compile("^pong.*$"))).get();
@@ -171,7 +184,7 @@ public abstract class ConServer implements Runnable {
                             case "image":
                                 checkAuth("image", auth);
                                 if (delegate != null) {
-                                    List<String> argList = args(rawCommand.substring(3));
+                                    List<String> argList = args(rawCommand.substring(5));
                                     response = delegate.sendCommand(new DelegatedCommand(command[0], argList, MATCH_OK)).get();
                                     image(argList);
                                 } else {
@@ -191,24 +204,50 @@ public abstract class ConServer implements Runnable {
                             case "scan":
                                 checkAuth("scan", auth);
                                 if (delegate != null) {
-                                    response = delegate.sendCommand(new DelegatedCommand(command[0], Collections.emptyList(), MATCH_DOWN)).get();
+                                    response = scan(delegate.sendCommand(new DelegatedCommand(command[0], Collections.emptyList(), MATCH_DOWN)));
                                 } else {
-                                    response = scan();
+                                    response = scan(null);
                                 }
-                                con.markButtons(parseButtons(response));
                                 break;
                             case "test":
                                 if (secret == null) {
                                     socket.setSoTimeout(300000);
                                 }
                                 checkAuth("test", auth);
+                                Future<String> future = null;
                                 if (delegate != null) {
-                                    response = delegate.sendCommand(new DelegatedCommand(command[0], Collections.emptyList(), MATCH_OK)).get();
+                                    future = delegate.sendCommand(new DelegatedCommand(command[0], Collections.emptyList(), MATCH_OK));
                                 }
                                 lcd(Arrays.asList("reset", "hard"));
                                 lcd(Arrays.asList("wake", "0xff"));
-                                lcd(Arrays.asList("brightness", "1000"));
+                                lcd(Arrays.asList("brightness", "750"));
+                                image(Arrays.asList("show", "@white", "0xff"));
+                                Thread.sleep(250);
                                 image(Arrays.asList("show", "@color-bars", "0xff"));
+                                Thread.sleep(2500);
+                                image(Arrays.asList("show", "@checkerboard", "0xff"));
+                                Thread.sleep(2500);
+                                image(Arrays.asList("show", "@aspect-ratio-grid", "0xff"));
+                                Thread.sleep(2500);
+                                lcd(Arrays.asList("brightness", "0"));
+                                image(Arrays.asList("show", "@skin-tones", "0xff"));
+                                for (int i = 0; i <= 1000; i += 25) {
+                                    lcd(Arrays.asList("brightness", String.valueOf(i)));
+                                    Thread.sleep(100);
+                                }
+                                for (int i = 1000; i >= 0; i -= 25) {
+                                    lcd(Arrays.asList("brightness", String.valueOf(i)));
+                                    Thread.sleep(100);
+                                }
+                                Thread.sleep(500);
+                                image(Arrays.asList("show", "@black", "0xff"));
+                                lcd(Arrays.asList("brightness", "750"));
+                                for (int i = 0; i < 8; i++) {
+                                    image(Arrays.asList("show", "@number-" + i, String.format("0x%02x", 1 << i)));
+                                }
+                                if (future != null) {
+                                    response = future.get();
+                                }
                                 break;
                             case "exit":
                             case "quit":
@@ -310,6 +349,159 @@ public abstract class ConServer implements Runnable {
                 // don't care
             }
         }
+    }
+
+    protected String help(List<String> args, boolean auth) {
+        StringBuilder buffer = new StringBuilder();
+        if (args.size() == 0) {
+            buffer.append("\tAvailable commands:\n");
+            buffer.append("\t\n");
+            if (auth) {
+                buffer.append("\tauth, exit, hello, help, image, lcd, ping, quit, scan, test\n");
+            } else {
+                buffer.append("\tauth, exit, hello, help, ping, quit\n");
+            }
+            buffer.append("\tEnter 'help [command]' for help on a specific command\n");
+            buffer.append("ok");
+        } else switch (args.get(0)) {
+            case "auth":
+                buffer.append("\tUsage: auth [token]\n");
+                buffer.append("\t\n");
+                buffer.append("\tAuthenticate to this system using the provided token. The token is a \n");
+                buffer.append("\thex encoded HMAC-SHA-256 of the challenge token returned by 'hello'\n");
+                buffer.append("\tusing the shared secret key. This command must be issued immediately\n");
+                buffer.append("\tfollowing the 'hello' command.\n");
+                buffer.append("\t\n");
+                buffer.append("\tResponses:\n");
+                buffer.append("\t\n");
+                buffer.append("\tauth-success\n");
+                buffer.append("\terr [message]\n");
+                buffer.append("ok");
+                break;
+            case "exit":
+                buffer.append("\tUsage exit\n");
+                buffer.append("\t\n");
+                buffer.append("\tTerminate the connection to this system, the socket will be closed.\n");
+                buffer.append("\t\n");
+                buffer.append("\tResponses:\n");
+                buffer.append("\t\n");
+                buffer.append("\tgoodbye\n");
+                buffer.append("ok");
+                break;
+            case "hello":
+                buffer.append("\tUsage: hello\n");
+                buffer.append("\t\n");
+                buffer.append("\tIssues a request to authenticate to this system.\n");
+                buffer.append("\tThis command must be followed immediately with the 'auth' command.\n");
+                buffer.append("\t\n");
+                buffer.append("\tResponses:\n");
+                buffer.append("\t\n");
+                buffer.append("\tauth-challenge [challenge-token]\n");
+                buffer.append("ok");
+                break;
+            case "help":
+                buffer.append("\tUsage: help [command]\n");
+                buffer.append("\t\n");
+                buffer.append("\tDisplays help on commands.\n");
+                buffer.append("\t\n");
+                buffer.append("\tResponses:\n");
+                buffer.append("\t\n");
+                buffer.append("\tok -- followed by multi-line plain text documentation.\n");
+                buffer.append("\terr [message]\n");
+                buffer.append("ok");
+                break;
+            case "image":
+                buffer.append("\tUsage: image store [name] [base64-data]\n");
+                buffer.append("\t       image show [name] [selector]\n");
+                buffer.append("\t       image clear [name]\n");
+                buffer.append("\t\n");
+                buffer.append("\tManipulates images that can be displayed. The [name] can only\n");
+                buffer.append("\tcontain letters or numbers. The base-64 data must contain a\n");
+                buffer.append("\trenderable uncompressed image in 12-bit, 16-bit or 24-bit packed\n");
+                buffer.append("\tform. The [selector] is an 8-bit hexadecimal selector indicating which\n");
+                buffer.append("\tdisplay or displays the image will be sent. The [name] may also be\n");
+                buffer.append("\tone of the built in test images:\n");
+                buffer.append("\t    @aspect-ratio-grid, @black, @checkerboard, @color-bars\n");
+                buffer.append("\t    @number-[0-7], @skin-tones or @white\n");
+                buffer.append("\t\n");
+                buffer.append("\tResponses:\n");
+                buffer.append("\t\n");
+                buffer.append("\tok\n");
+                buffer.append("\terr [message]\n");
+                buffer.append("ok");
+                break;
+            case "lcd":
+                buffer.append("\tUsage: lcd reset [selector]\n");
+                buffer.append("\t       lcd reset hard\n");
+                buffer.append("\t       lcd brightness [value]\n");
+                buffer.append("\t       lcd sleep [selector]\n");
+                buffer.append("\t       lcd wake [selector]\n");
+                buffer.append("\t       lcd cmd [selector] [command] [data...]\n");
+                buffer.append("\t\n");
+                buffer.append("\tManipulates the LCD displays. 'reset 0x##' will issue a soft reset\n");
+                buffer.append("\tcommand to the selected displays, while 'reset hard' will issue a\n");
+                buffer.append("\thard reset to all connected displays. [value] is a decimal value\n");
+                buffer.append("\tfrom 0 to 1000 and allows fine adjustment of the brightness of the\n");
+                buffer.append("\tLCD backlights. 'lcd sleep' will disable the selected displays and\n");
+                buffer.append("\tput them in a low-power state while 'lcd wake' will re-enable them.\n");
+                buffer.append("\t'lcd cmd' allows arbitrary commands to be issued directly to the\n");
+                buffer.append("\tdisplays. The [command] and [data] arguments are hexadecimal bytes.\n");
+                buffer.append("\t\n");
+                buffer.append("\tResponses:\n");
+                buffer.append("\t\n");
+                buffer.append("\tok\n");
+                buffer.append("\terr [message]\n");
+                buffer.append("ok");
+                break;
+            case "ping":
+                buffer.append("\tUsage: ping [text-to-echo]\n");
+                buffer.append("\t\n");
+                buffer.append("\tVerifies connectivity.\n");
+                buffer.append("\t\n");
+                buffer.append("\tResponses:\n");
+                buffer.append("\t\n");
+                buffer.append("\tpong [text-to-echo]\n");
+                buffer.append("ok");
+                break;
+            case "quit":
+                buffer.append("\tUsage quit\n");
+                buffer.append("\t\n");
+                buffer.append("\tTerminate the connection to this system, the socket will be closed.\n");
+                buffer.append("\t\n");
+                buffer.append("\tResponses:\n");
+                buffer.append("\t\n");
+                buffer.append("\tgoodbye\n");
+                buffer.append("ok");
+                break;
+            case "scan":
+                buffer.append("\tUsage: scan\n");
+                buffer.append("\t\n");
+                buffer.append("\tScans the input buttons and returns an array of flags, '-' or 'x',\n");
+                buffer.append("\twhere 'x' indicates that a particular button is down.\n");
+                buffer.append("\t\n");
+                buffer.append("\tResponses:\n");
+                buffer.append("\t\n");
+                buffer.append("\tdown [flags]\n");
+                buffer.append("ok");
+                break;
+            case "test":
+                buffer.append("\tUsage: test\n");
+                buffer.append("\t\n");
+                buffer.append("\tPerforms a simple test of the console. This series starts with a\n");
+                buffer.append("\thard reset then generates a series of diagnostic images and\n");
+                buffer.append("\tbrightness levels. These tests take approximately 25 seconds to\n");
+                buffer.append("\tcomplete.\n");
+                buffer.append("\t\n");
+                buffer.append("\tResponses:\n");
+                buffer.append("\t\n");
+                buffer.append("\tok\n");
+                buffer.append("ok");
+                break;
+            default:
+                buffer.append("err Unrecognized command '").append(args.get(0)).append("'");
+                break;
+        }
+        return buffer.toString();
     }
 
     protected String lcd(List<String> args) throws IOException {
@@ -453,17 +645,30 @@ public abstract class ConServer implements Runnable {
                 break;
             case "show":
                 switch (imageName) {
-                    case "@color-bars":
-                        data = getColorBars();
+                    case "@aspect-ratio-grid":
+                        data = IMAGE_SERIALIZER.serialize(TestImage.getAspectRatioGrid().getImage());
+                        break;
+                    case "@black":
+                        data = IMAGE_SERIALIZER.serialize(TestImage.getSolid(Color.BLACK).getImage());
                         break;
                     case "@checkerboard":
-                        data = getCheckerboard();
+                        data = IMAGE_SERIALIZER.serialize(TestImage.getCheckerboard().getImage());
                         break;
-                    case "@aspect-ratio-grid":
-                        data = getAspectRatioGrid();
+                    case "@color-bars":
+                        data = IMAGE_SERIALIZER.serialize(TestImage.getColorBars().getImage());
+                        break;
+                    case "@skin-tones":
+                        data = IMAGE_SERIALIZER.serialize(TestImage.getSkinTones().getImage());
+                        break;
+                    case "@white":
+                        data = IMAGE_SERIALIZER.serialize(TestImage.getSolid(Color.WHITE).getImage());
                         break;
                     default:
-                        data = imageDataCache.get(imageName);
+                        if (imageName.matches("@number-[0-7]")) {
+                            data = IMAGE_SERIALIZER.serialize(TestImage.getNumber(imageName.charAt(8) - '0').getImage());
+                        } else {
+                            data = imageDataCache.get(imageName);
+                        }
                         break;
                 }
                 if (data == null) {
@@ -487,10 +692,20 @@ public abstract class ConServer implements Runnable {
         return "ok";
     }
 
-    public String scan() {
+    public String scan(Future<String> mergeResult) throws ExecutionException, InterruptedException {
         StringBuilder builder = new StringBuilder(18);
         builder.append("down ");
         con.readButtons((b) -> builder.append(b ? 'x' : '-'));
+        if (mergeResult != null) {
+            String remoteResult = mergeResult.get();
+            if (remoteResult.startsWith("down") && remoteResult.length() == builder.length()) {
+                for (int i = 0, l = builder.length(); i < l; i++) {
+                    if (builder.charAt(i) == '-') {
+                        builder.setCharAt(i, remoteResult.charAt(i));
+                    }
+                }
+            }
+        }
         return builder.toString();
     }
 
@@ -504,116 +719,6 @@ public abstract class ConServer implements Runnable {
         } catch (IOException e) {
             throw new RuntimeException(e.getMessage(), e);
         }
-    }
-
-    protected static byte[] getColorBars() throws IOException {
-        @SuppressWarnings("SpellCheckingInspection")
-        byte[] png = Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAKAAAACACAMAAAC7vZIpAAABO1BMVEUCAgIKAAIE" +
-                                                "BAQFBQUGBgYRCB0PChAQDAsPCxkPCxwRDBAKDwkKDhcPDgkLDhUPDgoODg4LDw4R" +
-                                                "DgcODhAKDxINDw4NEAcKEBAPDw8IEgoMEQ1JAQIfDhRPAgoSExcMFhUUFBQTFRQM" +
-                                                "GAwhEwADA/8DBP4WFhYBBf4AHyUbGwBoAR8AIx5GBX0fIAAAJy0WG6pfAORgAOdl" +
-                                                "AOFhAedkAeVnAPlQE4oAOgALKaEKK5ILLpYOLpH/AQnxBgL9AwQuQkv4Af//AP//" +
-                                                "Af/8A/35BP/6BP32BvvzB//2B/jkFNzaGNnfFuB3SLyAQ9+AROJdo/hdpflTxUut" +
-                                                "qvsD/AAB+vwF+v0C+/8C/PoC/PsA/fsA//QQ/9ns6u///A39/gP9/wT/6+r/6+3/" +
-                                                "8Pz49/X89vj/9vb/+fn7+v/7/fph/+z1AAAAAWJLR0QAiAUdSAAAAAlwSFlzAAAL" +
-                                                "EwAACxMBAJqcGAAAAAd0SU1FB+AMHQgbAW0xedUAAAAmaVRYdENvbW1lbnQAAAAA" +
-                                                "AENyZWF0ZWQgd2l0aCBHSU1QIG9uIGEgTWFjleRfWwAAAUZJREFUeNrt0tVOA0EA" +
-                                                "heHBHZbF3aW4w+LuDsVbHPr+T0CyW7INnAmEpFz9//XJzJfJmEdd7F4Vvz5X3Z7J" +
-                                                "TtZUGwuLqvkunQEIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQI" +
-                                                "ECBAgAABAgQIECBAgAABAgQIECDA/wQO6wYjqo6DQ9X+tGzpWHXU16RqONWZHl1l" +
-                                                "taplRT7Kbo2sN6q6Ka9TFd7pjOVlSx1V86oE7six0y//w2W+HFdZ/hpAgAABphvY" +
-                                                "qStxXbfi2ynty+t+W5vbqe0Vh5WF66EL1VWOBj7ozJxuxvO855evPb0m/AbGJlKb" +
-                                                "HAkrCO9szFPlZmQHJVe1rX5t9Tozay/xZmtqdNxWkfNTmck+gd1BljVAgAABAgQI" +
-                                                "ECBAgAABAgQIECBAgH8CvqcHaAJf1u+AH2W5R6gIl+R/AAAAAElFTkSuQmCC");
-        return pngImageToRgbBytes(png);
-    }
-
-    protected static byte[] getCheckerboard() throws IOException {
-        @SuppressWarnings("SpellCheckingInspection")
-        byte[] png = Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAKAAAACACAQAAAAmaqqQAAAAAmJLR0QA/4ePzL8A" +
-                                                "AAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQfgDB4FLyceezNiAAAAJmlUWHRD" +
-                                                "b21tZW50AAAAAABDcmVhdGVkIHdpdGggR0lNUCBvbiBhIE1hY5XkX1sAAALeSURB" +
-                                                "VHja7Z2xbtRAFEXvjCeJEBLdgvgfaEIBEjV/RwUFVajo+Q4qlvwASmR7qBCd75U8" +
-                                                "WmXDuW2ejsdnnRnpjTUu6rIJSnTUS40hlaDmWjeDSHtHVEV2BYEIRCACEUgQiEAE" +
-                                                "IpAgEIEIRCBBIAIR+P+kfDIt2aKuzwHoqa5tzZU+mopZT/TO/uZFP/Td3Zh+64Op" +
-                                                "6Vr0xdZMer91ndX2tLuafM0L/TQ1i6RLy5FWU3Ovpq96a0lFi63purA/xLo5oub3" +
-                                                "DYrdN5i0qNodiEk92IHwnCt1TUN2V+aAc6m7TU4bMQ8sSjZnSrTJsw4Q8+9p3s5F" +
-                                                "QLljEWEVRiACCQIRiEAEEgQiEIEIJAhEIAIfT9pkClZNtrNbVHSUJynoEU+WU1T1" +
-                                                "ypKkakld3XJWzZuc5huYS/iYelKxpKSlX7WoR2NypCm6t8vtlv4pH/eka51pGTPz" +
-                                                "LEFN3fl3gkAEIhCBBIEIRCACCQIRiEAEEgQi8AHFNlRLYLlLei5PmgNSiRqzNwFp" +
-                                                "CkbUd7d426izVZJmaPJmc4+aqiUgrRrx/nfTfJpzY+oQxSPTh1Bm5kAWEQQikCAQ" +
-                                                "gQhEIEEgAhGIQIJABCLw8WRYQ/V20LHXvqFa1PU6IC2DWrzbfUwrsKtGF/H93x4I" +
-                                                "7MGpHVJVs6TkHJGuJRjR9k/axrTG0+e0BH/PnlJHaicaEXMgiwgCEYhAgkAEIhCB" +
-                                                "BIEIRCACCQIReEZpR1vS7Ucfi1YddLRVJSDNlrOq6VtAutcxEJB80HKL0w52IF23" +
-                                                "geQqT1JEOtiKSc8saZUCUg1GtG5ymv8fLtHZzhpyEEnKqcNIew9rGTYH9pPOPP3B" +
-                                                "XItFhFUYgQhEIEEgAhGIQIJABCIQgQSBCDyjDPmyoST9GvKSeQ8/3/cmICl62/oE" +
-                                                "L5n7DzoWe5m/t5SQMs4Y0rqb00a8iK3olnKSTkjay2EOZBFBIAIRSBCIQAQikCAQ" +
-                                                "gQhEIEEgAs8ofwCxCbD+Nzru2QAAAABJRU5ErkJggg==");
-        return pngImageToRgbBytes(png);
-    }
-
-    protected static byte[] getAspectRatioGrid() throws IOException {
-        @SuppressWarnings("SpellCheckingInspection")
-        byte[] png = Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAKAAAACABAMAAAB+TX8oAAAAMFBMVEUAAAAXFxcl" +
-                                                "JSUzMzNCQkJUVFRfX19xcXF/f3+MjIydnZ2srKy9vb3Ly8vb29vn5+frgVTdAAAA" +
-                                                "AWJLR0QAiAUdSAAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB+EBCAQEDm3F" +
-                                                "IwcAAAAmaVRYdENvbW1lbnQAAAAAAENyZWF0ZWQgd2l0aCBHSU1QIG9uIGEgTWFj" +
-                                                "leRfWwAAB4hJREFUaN7tmltvE0cUx2d9tynSLpfY5qGyDSROnxwcJQ68OI4aSHjo" +
-                                                "BhAUepHdQMKlqHagOKVK5VApdVRQzaUEhyJAlJKgqq1UiRapRUgVLfBUVWrV9Au0" +
-                                                "fIM+dmZ29jLj9e6Om1ZC7Ug58Vl7fvbOnJn97zkL6vUri3XYniBzD5krd2n/I93/" +
-                                                "DPuPkF3C/izy8cvfiA8A8IrQgCIyHch4Ypofxn4K2bzmu7OMLyM7gowfGeDFgAoy" +
-                                                "vdhPacAkBmY1P4J9mfExu6D5Tw2w+DeBMgUU2mcfzsRbBwobq49munSgMNclAilz" +
-                                                "tmVgNQf7d9xQgfFD+D+Iyi0Ch/CgAf+0AvT0iQoQRHrM4tBtF4d7Y6R/eCs0Y2Mv" +
-                                                "1YDavtk9Nja2bwaasQfInMH+RfTye2SmsP8JNAd0f+99rT/0gSQlNR8E4pIktfVD" +
-                                                "s2oaGqkPmbUjyJZ0v4DshOZH9f6+EUmNQNKK5mO4KrH+RiIhmY9hwdC/hKii4UCH" +
-                                                "CdB3u348vSmRTh9cvGwC9MqG/hG1k9r8Igt0bVvMam/3LuQagEFjfx/8bM14QMgz" +
-                                                "wMDNOPX+hrrIAPuN78PxE4rMAQrYeR4wTah303FJ9+8HrhR1YIICvt4FGprwXI0C" +
-                                                "Vqh3N9BzgmdFBw7LwKxtHjEAPfRnIiBAA0MG4FAKmLekrAP99IeC9CRBoCB5u1C4" +
-                                                "VsRwETRrL8ZEHOidghQUGeAUeUWOr6xWT39dhe2PqemmPCC8MfkEfejqZPUDuv8K" +
-                                                "EADsKSubQ34nsGhCXiYXJT/7CwPsATKGt0QrIGj7goxhIMb099IHegnQXQPW7TgB" +
-                                                "uvPMLDNxWCLA/TY84Co2iUPzleLN2gFBu+lKgSF6lhpsWQFO2PLwL0HAHHW0xuwW" +
-                                                "AWW38cXsgWj/jyhxYdhtUmqUkPa8sh+OOuChnxhRB9PwJdSoCsqO7ck6AcJRjGgy" +
-                                                "SZ/TdHq77q8YSKfTmdEDjnjAfWw7/Hh6ix6xoZ1pUC4f0aZF+HS8DP25a86AoHoG" +
-                                                "ff7QT9qBd8bL6BST6hnuwRd6T6dDHgjiU3aPqbHdqUqRSWVeknlFOZxzCgSXiHJQ" +
-                                                "Fke4ommbfRcAWDPfT7RN3jFwmGibvpsicJ8sGORcuL50USTqK+iYp+wsSM75Zh/P" +
-                                                "xZoJzpJzIO5lp2CFPAcw5wAYFDmAIQfAQQ4e3g0bgB76PqXCA0TdmPsUqA9PIKn3" +
-                                                "MzKnod6TuYBboT68g/TiV0QvQn3Y1qXpwW1Q7YlcwJAkrSlperFTQvrQR41hlIuH" +
-                                                "5JbNpJT4gLCfDbDICSzYAIUsJ3CTDdDR1cTYojbAECcPdrAGJnmBHrkBSIXNKC8Q" +
-                                                "VBigJHnjWA8ikxFq3MBpD7oREl9D/SOCBKrVMwtQ6c3+ifTevdlr3MC33v8VdV0i" +
-                                                "elHbHPDvbgMyNzDrkrUb8MYkBncYwgu75Sy7UtzAdksgd1zDyLYEBkVuYMgSyL1Q" +
-                                                "nlKgqAE7WgAGVtNAqAd3QpHX/SWSeoe38AP94+dR1wvIQL2I9OF7UOSVf0HmyttN" +
-                                                "+zWdfv/8D7DniYeo/5SiDw3X5VZOeb38f9j8o0tv2TcH93JvXy1ssN3W+pD/EtBv" +
-                                                "rQ/5r3pla33IDzxlrQ8nuIEVaynSyy1F8sssloKiNTDAu1RCyy040/+2JOa87zEV" +
-                                                "7fRtRQev3gTW+lAKcs6JIFnqQ/iCbzVvrlat9WELN4+W+hD+7eLhocyR3f1yiC+s" +
-                                                "HaQIeAZxwAGQaxCbJjE8B38fBfxpFn+MAF3jS8eNwMytTa7ehZQC9Dk/580kEdSx" +
-                                                "MCD01Ps14DBO+QtDKSWz5PxehaSq1uELitCXJ8B2NVPzZgdfMs2fwZmRXeqo7yH6" +
-                                                "8LqW+b2LRF5mv9MdZzfOH/Z8p0XlZawPj+p76rNlnD887zCq53D+8Ki+ha4sl+lc" +
-                                                "F05TeWIOBUlYmYQcvRIBpT5GlaRuyeGyQ0DBGLdr2bALKmlnv5MrS9Ak7YwqA9SV" +
-                                                "2JVVEuMlZ/sCAnYziXGhwq4lBHQwihFRARaYS4wrawa0VxCCeXFhPVv+GCRAr936" +
-                                                "6yGbgavIzDxzZY+qBZoH1jzvjwTYUORqrJopxYGC9bxMy8rvUTYcI/Bl+k7pGa2+" +
-                                                "/GrBgveCVl9+he4fYtN7Ib2+3NlclXR2afXldaLtKWuFwvFm4d1WaVooDLGLImkA" +
-                                                "CifNozF6CuhAJhyigLmRGKWKrXUzYvg6AE2LrWvZPHiFLgcPN26NRw7Q9eUimym3" +
-                                                "LlgPv0sPyaqTMlOwHqHDCdCqGq0buqS++vBNg9aaPyayJfUIrbiZ4mYUNBb9g4/n" +
-                                                "com4lEgM1r8lCs4I9KXoLY2uFFZMgJ6UkEgP3hlIx0XTxxKM/XdAfSgakv8+JBVJ" +
-                                                "fRmZpACNBwU6yAtKPRn66EEKrb4MRaHxjLE+1L/iKhJ5pL6MzOesP4n8h+ilWl+G" +
-                                                "+vC+viIVfbhHHcW23fhrYppetHj4RNeDrkm1v3dc+SfNkBOexhd67sdjCgfJCZ8L" +
-                                                "kFDxXojDydn4casP8Lg/RP3XzOliyTU0v3gp1/ojRq5M/falHSKlD2uaPmztIahi" +
-                                                "c8H5X3iQbHkfxlvuxwX/AnYpmtz4OdX5AAAAAElFTkSuQmCC");
-        return pngImageToRgbBytes(png);
-    }
-
-    private static byte[] pngImageToRgbBytes(byte[] png) throws IOException {
-        BufferedImage bufferedImage;
-        bufferedImage = ImageIO.read(new ByteArrayInputStream(png));
-
-        int i = 0;
-        byte[] buf = new byte[61440];
-        for (int argb : bufferedImage.getRGB(0, 0, 160, 128, null, 0, 160)) {
-            buf[i++] = (byte)((argb >> 16) & 0xFF);
-            buf[i++] = (byte)((argb >> 8) & 0xFF);
-            buf[i++] = (byte)(argb & 0xFF);
-        }
-        return buf;
     }
 
     public int getIdleTimeout() {

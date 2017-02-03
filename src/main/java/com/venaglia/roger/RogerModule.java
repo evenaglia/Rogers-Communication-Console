@@ -19,9 +19,13 @@ package com.venaglia.roger;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
+import com.google.inject.TypeLiteral;
 import com.google.inject.name.Named;
 import com.venaglia.roger.autocomplete.AutoCompleter;
+import com.venaglia.roger.autocomplete.Reducer;
 import com.venaglia.roger.autocomplete.impl.DummyAutoCompleter;
+import com.venaglia.roger.autocomplete.reducers.HardConsonantReducer;
+import com.venaglia.roger.autocomplete.reducers.SoftConsonantReducer;
 import com.venaglia.roger.buttons.ButtonSet;
 import com.venaglia.roger.buttons.ButtonSetLoader;
 import com.venaglia.roger.emoji.EmojiSet;
@@ -32,7 +36,10 @@ import com.venaglia.roger.ui.FontLoader;
 import com.venaglia.roger.ui.UI;
 import com.venaglia.roger.ui.impl.UIImpl;
 
-import java.awt.*;
+import java.awt.Font;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.NavigableSet;
 import java.util.TreeSet;
 import java.util.concurrent.ScheduledExecutorService;

@@ -51,7 +51,12 @@ public class VirtualButton extends JComponent {
     private final BasicStroke stroke;
     private final MyMouseHandler mouseHandler;
     private final AtomicReference<BufferedImage> image = new AtomicReference<>(new BufferedImage(160, 128, BufferedImage.TYPE_INT_ARGB));
-    private final ConsumerSupplier<Boolean> buttonState = new ConsumerSupplier<>(false);
+    private final ConsumerSupplier<Boolean> buttonState = new ConsumerSupplier<Boolean>(false) {
+        @Override
+        protected void changed(Boolean oldValue, Boolean newValue) {
+            repaint();
+        }
+    };
     private final Lock updateLock = new ReentrantLock(true);
 
     private double rotate = 0.0;
@@ -116,18 +121,54 @@ public class VirtualButton extends JComponent {
 
     public void setImageBytesRgb(byte[] imageBytesRgb) {
         assert imageBytesRgb != null;
-        assert imageBytesRgb.length == 160 * 128 * 3;
+        assert imageBytesRgb.length == 160 * 128 * 3 || imageBytesRgb.length == 160 * 128 * 2 || imageBytesRgb.length == 160 * 128 * 3 / 2;
         updateLock.lock();
         try {
             int i = 0;
-            for (int y = 0; y < 128; y++) {
-                for (int x = 0; x < 160; x++) {
-                    int rgb = 0xFF;
-                    rgb = rgb << 8 | (imageBytesRgb[i++] & 0xFF);
-                    rgb = rgb << 8 | (imageBytesRgb[i++] & 0xFF);
-                    rgb = rgb << 8 | (imageBytesRgb[i++] & 0xFF);
-                    altImage.setRGB(x, y, rgb);
-                }
+            switch (imageBytesRgb.length) {
+                case 160 * 128 * 3: // 8-8-8
+                    for (int y = 0; y < 128; y++) {
+                        for (int x = 0; x < 160; x++) {
+                            int rgb = 0xFF000000 |
+                                      (imageBytesRgb[i++] & 0xFC) << 16 |
+                                      (imageBytesRgb[i++] & 0xFC) << 8 |
+                                      (imageBytesRgb[i++] & 0xFC);
+                            altImage.setRGB(x, y, rgb);
+                        }
+                    }
+                    break;
+                case 160 * 128 * 2: // 5-6-5
+                    for (int y = 0; y < 128; y++) {
+                        for (int x = 0; x < 160; x++) {
+                            int value = (imageBytesRgb[i++] & 0xFF) << 8 |
+                                        (imageBytesRgb[i++] & 0xFF);
+                            int rgb = 0xFF000000 |
+                                      (value & 0xF800) << 8 |
+                                      (value & 0x07E0) << 5 |
+                                      (value & 0x001F) << 3;
+                            altImage.setRGB(x, y, rgb);
+                        }
+                    }
+                    break;
+                case 160 * 128 * 3 / 2: // 4-4-4
+                    for (int y = 0; y < 128; y++) {
+                        for (int x = 0; x < 160; x+=2) {
+                            int value = (imageBytesRgb[i++] & 0xFF) << 16;
+                            value |= (imageBytesRgb[i++] & 0xFF) << 8;
+                            value |= (imageBytesRgb[i++] & 0xFF);
+                            int rgb = 0xFF000000;
+                            rgb |= (value & 0xF00000);
+                            rgb |= (value & 0x0F0000) >> 4;
+                            rgb |= (value & 0x00F000) >> 8;
+                            altImage.setRGB(x, y, rgb);
+                            rgb = 0xFF000000;
+                            rgb |= (value & 0x000F00) << 12;
+                            rgb |= (value & 0x0000F0) << 8;
+                            rgb |= (value & 0x00000F) << 4;
+                            altImage.setRGB(x + 1, y, rgb);
+                        }
+                    }
+                    break;
             }
             BufferedImage img = image.get();
             image.set(altImage);
@@ -185,6 +226,7 @@ public class VirtualButton extends JComponent {
         private enum State {
             MOUSE_UP,
             MOUSE_DOWN,
+            MOUSE_DOWN_SICKY,
             MOUSE_DOWN_BUT_OUTSIDE,
         }
 
@@ -193,16 +235,35 @@ public class VirtualButton extends JComponent {
 
         @Override
         public void mousePressed(MouseEvent e) {
-            state = State.MOUSE_DOWN;
-            if (stateListener != null) {
-                stateListener.accept(true);
+            if (e.isShiftDown()) {
+                if (state == State.MOUSE_DOWN_SICKY) {
+                    state = State.MOUSE_UP;
+                    if (stateListener != null) {
+                        stateListener.accept(false);
+                    }
+                } else {
+                    state = State.MOUSE_DOWN_SICKY;
+                    if (stateListener != null) {
+                        stateListener.accept(true);
+                    }
+                }
+            } else {
+                if (state != State.MOUSE_DOWN) {
+                    state = State.MOUSE_DOWN;
+                    if (stateListener != null) {
+                        stateListener.accept(true);
+                    }
+                }
             }
         }
 
         @Override
         public void mouseReleased(MouseEvent e) {
-            if (state == State.MOUSE_DOWN && stateListener != null) {
-                stateListener.accept(false);
+            if (state != State.MOUSE_UP && state != State.MOUSE_DOWN_SICKY) {
+                state = State.MOUSE_UP;
+                if (stateListener != null) {
+                    stateListener.accept(false);
+                }
             }
         }
 
@@ -248,9 +309,15 @@ public class VirtualButton extends JComponent {
             this.value = value;
         }
 
+        protected void changed(T oldValue, T newValue) {}
+
         @Override
         public void accept(T value) {
-            this.value = value;
+            T oldValue = this.value;
+            if (oldValue == null ? value != null : !this.value.equals(value)) {
+                this.value = value;
+                changed(oldValue, value);
+            }
         }
 
         @Override

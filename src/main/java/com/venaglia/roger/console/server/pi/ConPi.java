@@ -39,6 +39,7 @@ import com.pi4j.wiringpi.Gpio;
 import com.pi4j.wiringpi.Spi;
 import com.venaglia.roger.console.server.ConServer;
 import com.venaglia.roger.console.server.Con;
+import com.venaglia.roger.console.server.impl.TestImage;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -79,7 +80,7 @@ public class ConPi extends ConServer {
 
         Con con = getCon();
         for (String id : "0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80".split(",")) {
-            byte[] colorBars = getColorBars();
+            byte[] colorBars = IMAGE_SERIALIZER.serialize(TestImage.getColorBars().getImage());
             byte who = (byte)Integer.parseInt(id.substring(2), 16);
             con.wake(who);
             con.updateImage(who, colorBars);
@@ -207,11 +208,6 @@ public class ConPi extends ConServer {
                 buttonStateConsumer.accept(rowPins[2].getState() == PinState.LOW);
                 buttonStateConsumer.accept(rowPins[3].getState() == PinState.LOW);
                 columnPins[2].setMode(DIGITAL_INPUT);
-            }
-
-            @Override
-            public void markButtons(Iterable<Boolean> buttons) {
-                // no-op
             }
 
             @Override

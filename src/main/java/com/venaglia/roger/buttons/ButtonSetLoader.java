@@ -18,16 +18,14 @@
 package com.venaglia.roger.buttons;
 
 import com.google.inject.Inject;
-import com.google.inject.Provider;
 import com.google.inject.Singleton;
 import com.venaglia.roger.bundle.AbstractLoader;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 import java.awt.Font;
 import java.awt.image.BufferedImage;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -47,7 +45,7 @@ public class ButtonSetLoader extends AbstractLoader<ButtonSet> {
 
     protected ButtonSet load() {
         Map<String,Button> buttonMap = new HashMap<>();
-        Reader reader = new InputStreamReader(getStream(source));
+        Reader reader = new InputStreamReader(getStream(source), StandardCharsets.UTF_8);
         String s = readString(reader);
         parseButtonFile(buttonMap, s);
         return new ButtonSet() {
@@ -77,20 +75,10 @@ public class ButtonSetLoader extends AbstractLoader<ButtonSet> {
         };
     }
 
-    private void parseJSON(Map<String, Button> buttonMap, String s) {
-        s = s.replaceAll("(?m)^\\s*//.*$", "");
-        JSONObject obj = new JSONObject(s);
-        JSONArray array = obj.getJSONArray("buttons");
-        for (int i = 0, l = array.length(); i < l; i++) {
-            Button button = parseButton(array.getJSONObject(i));
-            buttonMap.put(button.getId(), button);
-        }
-    }
-
     private void parseButtonFile(Map<String,Button> buttonMap, String s) {
         Pattern matchNameValue = Pattern.compile("^\\s+([a-zA-Z0-9_-]+)\\s*:\\s*(.*)$");
         String[] lines = s.split("\n");
-        JSONObject buffer = new JSONObject();
+        Map<String,String> buffer = new HashMap<>();
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i];
             String trim = line.trim();
@@ -115,25 +103,30 @@ public class ButtonSetLoader extends AbstractLoader<ButtonSet> {
                     System.err.printf("Syntax error in %s [line %d]: '%s'\n", source, i + 1, line);
                 }
             } else {
-                if (buffer.length() > 0) {
+                if (buffer.size() > 0) {
                     Button button = parseButton(buffer);
                     buttonMap.put(button.getId(), button);
                 }
-                buffer = new JSONObject().put("id", trim);
+                buffer = new HashMap<>();
+                buffer.put("id", trim);
             }
+        }
+        if (buffer.size() > 0) {
+            Button button = parseButton(buffer);
+            buttonMap.put(button.getId(), button);
         }
     }
 
-    private Button parseButton(JSONObject json) {
-        String chString = json.optString("char");
+    private Button parseButton(Map<String,String> json) {
+        String chString = json.get("char");
         Character ch = chString != null && chString.length() > 0 ? chString.charAt(0) : null;
-        String id = json.getString("id");
-        String filename = json.optString("image", null);
-        String label = json.optString("label");
-        String text = json.optString("text");
-        BufferedImage emoji = bufferImage(json.optString("emoji", null));
-        String _do = json.optString("do", null);
-        String alt = json.optString("alt", null);
+        String id = json.getOrDefault("id", "");
+        String filename = json.get("image");
+        String label = json.getOrDefault("label", "");
+        String text = json.getOrDefault("text", "");
+        BufferedImage emoji = bufferImage(json.get("emoji"));
+        String _do = json.get("do");
+        String alt = json.get("alt");
         return createButton(id, filename, label, text, ch, emoji, _do, alt);
     }
 

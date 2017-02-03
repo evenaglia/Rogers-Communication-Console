@@ -15,27 +15,18 @@
  *
  */
 
-package com.venaglia.roger.autocomplete.impl;
+package com.venaglia.roger.ui;
 
-import com.venaglia.roger.autocomplete.AutoCompleter;
-import com.venaglia.roger.autocomplete.CompletablePart;
+import com.google.inject.ImplementedBy;
+import com.venaglia.roger.ui.impl.ImageSerializer565;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.awt.image.BufferedImage;
 
 /**
- * Created by ed on 9/5/16.
+ * Created by ed on 1/26/17.
  */
-public class DummyAutoCompleter implements AutoCompleter {
+@ImplementedBy(ImageSerializer565.class)
+public interface ImageSerializer {
 
-    @Override
-    public Set<CompletablePart> suggest(List<CompletablePart> lastFewParts, int limit) {
-        return Collections.emptySet();
-    }
-
-    @Override
-    public Set<String> suggestWord(String stringSoFar) {
-        return Collections.emptySet();
-    }
+    byte[] serialize(BufferedImage bufferedImage);
 }

@@ -27,6 +27,7 @@ import com.venaglia.roger.buttons.SimpleButtonListener;
 import com.venaglia.roger.output.OutputWindow;
 import com.venaglia.roger.ui.ButtonListener;
 import com.venaglia.roger.ui.ButtonProcessor;
+import com.venaglia.roger.ui.ImageSerializer;
 import com.venaglia.roger.ui.UI;
 
 import javax.swing.JFrame;
@@ -60,14 +61,15 @@ public class UIImpl implements UI {
     public UIImpl(OutputWindow outputWindow,
                   ScheduledExecutorService executor,
                   ButtonProcessor buttonProcessor,
-                  ConClient conClient) {
+                  ConClient conClient,
+                  ImageSerializer imageSerializer) {
         this.outputWindow = outputWindow;
         this.buttonProcessor = buttonProcessor;
         this.conClient = conClient;
         this.commandCache = CacheBuilder.newBuilder().initialCapacity(128).build(new CacheLoader<Button, DisplayUpdateCommand>() {
             @Override
             public DisplayUpdateCommand load(Button button) throws Exception {
-                return new DisplayUpdateCommand(button.getButtonFace().getImageDataRGB());
+                return new DisplayUpdateCommand(button.getButtonFace().getImageDataRGB(imageSerializer));
             }
         });
         this.readButtons = new ScanButtonsCommand(this::processScanCode);

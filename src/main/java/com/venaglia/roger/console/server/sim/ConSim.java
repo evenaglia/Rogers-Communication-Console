@@ -37,7 +37,7 @@ import java.util.function.Consumer;
  */
 public class ConSim extends ConServer {
 
-    private static final long DATA_RATE = 1000000;
+    private static final long DATA_RATE = 8000000;
 
     private final SimulatedButtons simulatedButtons;
     private final Executor executor;
@@ -74,12 +74,12 @@ public class ConSim extends ConServer {
         return new Con() {
 
             private final float pwmRange = PWM_RANGE;
-            private final byte[][] last = new byte[8][];
-            private final byte[] buffer = new byte[160 * 128 * 3];
+            private final BufferSpectrum[] last = new BufferSpectrum[8];
+            private final BufferSpectrum buffer = new BufferSpectrum();
 
             {
                 for (int i = 0; i < 8; i++) {
-                    last[i] = new byte[160 * 128 * 3];
+                    last[i] = new BufferSpectrum();
                 }
             }
 
@@ -113,8 +113,8 @@ public class ConSim extends ConServer {
                 if (brightnessValue != value) {
                     brightnessValue = Math.min(PWM_RANGE, Math.max(0, value));
                     brightness = value / pwmRange;
-                    brightnessBase = brightness * brightness * 0.75f;
-                    brightnessScale = Math.min(1.0f - brightnessBase, brightness * 2.25f + 0.075f);
+                    brightnessBase = brightness * brightness * 0.25f;
+                    brightnessScale = Math.min(1.0f - brightnessBase, brightness * 1.5f + 0.075f);
                     refreshImage((byte)0xFF);
                 }
             }
@@ -161,7 +161,7 @@ public class ConSim extends ConServer {
 
             @Override
             public void updateImage(byte selectorByte, byte[] data) throws IOException {
-                assert data.length == buffer.length;
+                assert data.length == 160 * 128 * 3 || data.length == 160 * 128 * 2 || data.length == 160 * 128 * 3 / 2;
                 if (selectorByte == 0) {
                     return; // no-op
                 }
@@ -171,18 +171,19 @@ public class ConSim extends ConServer {
                     float scale = this.brightnessScale;
                     float base = this.brightnessBase;
                     byte update = 0;
+                    BufferSpectrum spectrum = null;
                     for (int i = 0, m = 1; i < 8; i++, m <<= 1) {
                         if ((selectorByte & m) != 0 && !sleeping[i]) {
-                            System.arraycopy(d, 0, last[i], 0, d.length);
+                            System.arraycopy(d, 0, last[i].select(data.length), 0, d.length);
+                            spectrum = last[i];
                             update |= m;
                         }
                     }
-                    for (int j = 0, l = d.length; j < l; j++) {
-                        buffer[j] = (byte)((int)((d[j] & 0xFF) * scale + base * 0xFF) & 0xFF);
+                    if (spectrum != null) {
+                        simulatedButtons.setImageBytesRgb(update, spectrum.scale(scale, base, buffer));
                     }
-                    simulatedButtons.setImageBytesRgb(update, buffer);
                 });
-                until += timeFor(4, 4, 160 * 128 * 3); // rol/col select + image data transfer
+                until += timeFor(4, 4, buffer.current().length); // rol/col select + image data transfer
                 sleepUntil(until);
             }
 
@@ -200,11 +201,6 @@ public class ConSim extends ConServer {
                 for (Boolean state : simulatedButtons.getButtonStates()) {
                     resultBuilder.accept(state);
                 }
-            }
-
-            @Override
-            public void markButtons(Iterable<Boolean> buttons) {
-                simulatedButtons.showButtonState(buttons);
             }
 
             @Override
@@ -235,11 +231,8 @@ public class ConSim extends ConServer {
                     float base = this.brightnessBase;
                     for (int i = 0, m = 1; i < 8; i++, m <<= 1) {
                         if ((selectorByte & m) != 0 && !sleeping[i]) {
-                            byte[] data = last[i];
-                            for (int j = 0, l = data.length; j < l; j++) {
-                                buffer[j] = (byte)((int)((data[j] & 0xFF) * scale + base * 0xFF) & 0xFF);
-                            }
-                            simulatedButtons.setImageBytesRgb((byte)(m & 0xFF), buffer);
+                            byte[] data = last[i].scale(scale, base, buffer);
+                            simulatedButtons.setImageBytesRgb((byte)(m & 0xFF), data);
                         }
                     }
                 });
@@ -249,16 +242,90 @@ public class ConSim extends ConServer {
                 if (selectorByte == 0) {
                     return; // no-op
                 }
+                byte[] b = buffer.current();
                 executor.execute(() -> {
-                    byte base = (byte)((int)(brightnessBase * 0xFF) & 0xFF);
-                    Arrays.fill(buffer, base);
+                    Arrays.fill(b, buffer.black(brightnessBase));
                     for (int i = 0, m = 1; i < 8; i++, m <<= 1) {
                         if ((selectorByte & m) != 0) {
-                            simulatedButtons.setImageBytesRgb((byte)(m & 0xFF), buffer);
+                            simulatedButtons.setImageBytesRgb((byte)(m & 0xFF), b);
                         }
                     }
                 });
             }
         };
+    }
+
+    private static class BufferSpectrum {
+        private final byte[] _888 = new byte[160 * 128 * 3];
+        private final byte[] _565 = new byte[160 * 128 * 2];
+        private final byte[] _444 = new byte[160 * 128 * 3 / 2];
+
+        private byte[] active = _888;
+
+        byte[] select(int dataLength) {
+            switch (dataLength) {
+                case 160 * 128 * 3:     active = _888; break;
+                case 160 * 128 * 2:     active = _565; break;
+                case 160 * 128 * 3 / 2: active = _444; break;
+            }
+            return active;
+        }
+
+        byte[] current() {
+            return active;
+        }
+
+        byte[] scale(float scale, float base, BufferSpectrum buffer) {
+            byte[] b = buffer.select(active.length);
+            switch (active.length) {
+                case 160 * 128 * 3: // 8-8-8
+                    for (int j = 0, l = active.length; j < l; j++) {
+                        b[j] = (byte)((int)((active[j] & 0xFF) * scale + base * 0xFF) & 0xFF);
+                    }
+                    break;
+                case 160 * 128 * 2: // 5-6-5
+                    for (int j = 0, l = active.length; j < l; j+=2) {
+                        int rgb = (active[j] & 0xFF) << 8 | (active[j+1] & 0xFF);
+                        rgb = (int)((rgb & 0xF800) * scale + base * 0xF800) & 0xF800 |
+                              (int)((rgb & 0x07E0) * scale + base * 0x07E0) & 0x07E0 |
+                              (int)((rgb & 0x001F) * scale + base * 0x001F) & 0x001F;
+                        b[j]   = (byte)(rgb >> 8 & 0xFF);
+                        b[j+1] = (byte)(rgb & 0xFF);
+                    }
+                    break;
+                case 160 * 128 * 3 / 2: // 4-4-4
+                    for (int j = 0, l = active.length; j < l; j+=3) {
+                        int rgb = (active[j] & 0xFF) << 16 | (active[j+1] & 0xFF) << 8 | (active[j+2] & 0xFF);
+                        rgb = (int)((rgb & 0xF00000) * scale + base * 0xF00000) & 0xF00000 |
+                              (int)((rgb & 0x0F0000) * scale + base * 0x0F0000) & 0x0F0000 |
+                              (int)((rgb & 0x00F000) * scale + base * 0x00F000) & 0x00F000 |
+                              (int)((rgb & 0x000F00) * scale + base * 0x000F00) & 0x000F00 |
+                              (int)((rgb & 0x0000F0) * scale + base * 0x0000F0) & 0x0000F0 |
+                              (int)((rgb & 0x00000F) * scale + base * 0x00000F) & 0x00000F;
+                        b[j]   = (byte)((rgb) >> 16 & 0xFF);
+                        b[j+1]   = (byte)((rgb) >> 8 & 0xFF);
+                        b[j+2] = (byte)((rgb) & 0xFF);
+                    }
+                    break;
+            }
+            return b;
+        }
+
+        byte black(float base) {
+            int value = Math.min(0xFF, Math.round(base * 0xFF)) & 0xFF;
+            int b;
+            switch (active.length) {
+                case 160 * 128 * 3:
+                    return (byte)value;
+                case 160 * 128 * 2:
+                    b = (value << 8 & 0xF800) | (value << 3 & 0x07E0) | (value >> 3 & 0x001F);
+                    return (byte)b;
+                case 160 * 128 * 3 / 2:
+                    b = (value << 4 & 0xF00) | (value & 0x0F0) | (value >> 4 & 0x00F);
+                    b |= b << 12;
+                    return (byte)b;
+            }
+            return 0;
+        }
     }
 }

@@ -120,7 +120,11 @@ public class ConClient implements Runnable {
         }
         out.write('\n');
         out.flush();
-        return in.readLine();
+        String line = in.readLine();
+        while (line.length() > 0 && (line.charAt(0) == '\t' || line.charAt(0) == '#')) {
+            line = in.readLine();
+        }
+        return line;
     }
 
     private Socket connect() {

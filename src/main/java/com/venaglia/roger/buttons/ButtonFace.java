@@ -18,6 +18,7 @@
 package com.venaglia.roger.buttons;
 
 import com.venaglia.roger.bundle.Bundle;
+import com.venaglia.roger.ui.ImageSerializer;
 
 import javax.imageio.ImageIO;
 import java.awt.AlphaComposite;
@@ -87,16 +88,9 @@ public class ButtonFace {
         return label;
     }
 
-    public byte[] getImageDataRGB() {
+    public byte[] getImageDataRGB(ImageSerializer imageSerializer) {
         if (imageDataRGB == null) {
-            byte[] buf = new byte[128 * 160 * 3];
-            int i = 0;
-            for (int argb : bufferImageImpl().getRGB(0, 0, 160, 128, null, 0, 160)) {
-                buf[i++] = (byte)((argb >> 16) & 0xFF);
-                buf[i++] = (byte)((argb >> 8) & 0xFF);
-                buf[i++] = (byte)(argb & 0xFF);
-            }
-            imageDataRGB = buf;
+            imageDataRGB = imageSerializer.serialize(bufferImageImpl());
         }
         return imageDataRGB;
     }

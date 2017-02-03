@@ -15,27 +15,26 @@
  *
  */
 
-package com.venaglia.roger.autocomplete.impl;
+package com.venaglia.roger.ui.impl;
 
-import com.venaglia.roger.autocomplete.AutoCompleter;
-import com.venaglia.roger.autocomplete.CompletablePart;
+import com.venaglia.roger.ui.ImageSerializer;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.awt.image.BufferedImage;
 
 /**
- * Created by ed on 9/5/16.
+ * Created by ed on 1/26/17.
  */
-public class DummyAutoCompleter implements AutoCompleter {
+public class ImageSerializer888 implements ImageSerializer {
 
     @Override
-    public Set<CompletablePart> suggest(List<CompletablePart> lastFewParts, int limit) {
-        return Collections.emptySet();
-    }
-
-    @Override
-    public Set<String> suggestWord(String stringSoFar) {
-        return Collections.emptySet();
+    public byte[] serialize(BufferedImage bufferedImage) {
+        byte[] buf = new byte[128 * 160 * 3]; // 61440 ~= 62ms @ 8Mbps [31 blocks]
+        int i = 0;
+        for (int argb : bufferedImage.getRGB(0, 0, 160, 128, null, 0, 160)) {
+            buf[i++] = (byte)((argb >> 16) & 0xFF);
+            buf[i++] = (byte)((argb >> 8) & 0xFF);
+            buf[i++] = (byte)(argb & 0xFF);
+        }
+        return buf;
     }
 }

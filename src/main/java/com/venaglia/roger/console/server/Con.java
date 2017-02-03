@@ -39,7 +39,5 @@ public interface Con {
 
     void readButtons(Consumer<Boolean> resultBuilder);
 
-    void markButtons(Iterable<Boolean> buttons);
-
     void sendRaw(byte selectorByte, byte command, byte... bytes) throws IOException;
 }

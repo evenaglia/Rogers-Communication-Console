@@ -28,7 +28,7 @@ import java.io.InputStream;
  */
 public class FontLoader implements Provider<Font> {
 
-    private static final String source = "WorkSans-Regular.ttf";
+    private static final String source = "WorkSans-Light.ttf";
 
     private Font font;
 

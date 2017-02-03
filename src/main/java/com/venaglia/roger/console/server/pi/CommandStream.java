@@ -19,6 +19,7 @@ package com.venaglia.roger.console.server.pi;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.PrimitiveIterator;
 
 /**
  * Created by ed on 1/8/17.
@@ -28,12 +29,18 @@ class CommandStream extends InputStream {
     private int index = 0;
     private int length = 0;
     private byte command;
+    private PrimitiveIterator.OfInt order;
     private byte[] data;
 
     void load(byte command, byte... data) {
+        load(command, null, data);
+    }
+
+    void load(byte command, PrimitiveIterator.OfInt order, byte... data) {
         this.index = -1;
         this.length = data.length;
         this.command = command;
+        this.order = order;
         this.data = data;
     }
 
@@ -41,6 +48,7 @@ class CommandStream extends InputStream {
         index = 0;
         length = 0;
         command = 0x00;
+        order = null;
         data = null;
     }
 
@@ -58,6 +66,9 @@ class CommandStream extends InputStream {
 
     @Override
     public int read(byte[] b, int off, int len) throws IOException {
+        if (order != null) {
+            return super.read(b, off, len);
+        }
         if (len <= 0) {
             return 0;
         }

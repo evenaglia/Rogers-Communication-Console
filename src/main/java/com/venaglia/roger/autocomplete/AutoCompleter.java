@@ -18,13 +18,14 @@
 package com.venaglia.roger.autocomplete;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Created by ed on 9/4/16.
  */
 public interface AutoCompleter {
 
-    List<CompletablePart> suggest(List<CompletablePart> lastFewParts, int limit);
+    Set<CompletablePart> suggest(List<CompletablePart> lastFewParts, int limit);
 
-    List<String> suggestWord(String wordSoFar);
+    Set<String> suggestWord(String stringSoFar);
 }

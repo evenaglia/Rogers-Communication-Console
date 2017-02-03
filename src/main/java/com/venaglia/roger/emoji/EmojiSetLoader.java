@@ -24,6 +24,7 @@ import org.json.JSONObject;
 
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -38,7 +39,7 @@ public class EmojiSetLoader extends AbstractLoader<EmojiSet> {
     @Override
     protected EmojiSet load() {
         Map<String,Emoji> emojiMap = new HashMap<>();
-        Reader reader = new InputStreamReader(getStream(source));
+        Reader reader = new InputStreamReader(getStream(source), StandardCharsets.UTF_8);
         String s = readString(reader);
         s = s.replaceAll("(?m)^\\s*//.*$", "");
         JSONObject obj = new JSONObject(s);

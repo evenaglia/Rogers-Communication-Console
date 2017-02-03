@@ -15,27 +15,11 @@
  *
  */
 
-package com.venaglia.roger.autocomplete.impl;
-
-import com.venaglia.roger.autocomplete.AutoCompleter;
-import com.venaglia.roger.autocomplete.CompletablePart;
-
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+package com.venaglia.roger.autocomplete.reducers;
 
 /**
- * Created by ed on 9/5/16.
+ * Created by ed on 2/1/17.
  */
-public class DummyAutoCompleter implements AutoCompleter {
+public class IdentityReducer extends AbstractReducer {
 
-    @Override
-    public Set<CompletablePart> suggest(List<CompletablePart> lastFewParts, int limit) {
-        return Collections.emptySet();
-    }
-
-    @Override
-    public Set<String> suggestWord(String stringSoFar) {
-        return Collections.emptySet();
-    }
 }
