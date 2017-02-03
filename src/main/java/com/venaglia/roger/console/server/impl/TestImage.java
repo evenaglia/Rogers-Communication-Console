@@ -450,7 +450,7 @@ public class TestImage {
         g.dispose();
         BufferedImage result = new BufferedImage(160, 16, BufferedImage.TYPE_4BYTE_ABGR);
         int[] buffer = new int[9];
-        int[] mask = MASK_VBGR;
+        int[] mask = MASK_VRGB;
         float pels = mask[9];
         for (int y = 0; y < 16; y++) {
             for (int x = 0; x < 160; x++) {
