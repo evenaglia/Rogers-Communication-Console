@@ -34,12 +34,12 @@ public class ImageSerializer444 implements ImageSerializer {
 
     public ImageSerializer444() {
         int[] lut84 = LUTils.genLUT(8, 4);
-        lutR = LUTils.shiftLUT(8, lut84);
+        lutR = lut84;
         lutG = LUTils.shiftLUT(4, lut84);
-        lutB = lut84;
-        assert LUTils.orLUT(lutR) == 0xF00;
+        lutB = LUTils.shiftLUT(8, lut84);
+        assert LUTils.orLUT(lutR) == 0x00F;
         assert LUTils.orLUT(lutG) == 0x0F0;
-        assert LUTils.orLUT(lutB) == 0x00F;
+        assert LUTils.orLUT(lutB) == 0xF00;
     }
 
     @Override

@@ -156,16 +156,16 @@ public class VirtualButton extends JComponent {
                             int value = (imageBytesRgb[i++] & 0xFF) << 16;
                             value |= (imageBytesRgb[i++] & 0xFF) << 8;
                             value |= (imageBytesRgb[i++] & 0xFF);
-                            int rgb = 0xFF000000;
-                            rgb |= (value & 0xF00000);
-                            rgb |= (value & 0x0F0000) >> 4;
-                            rgb |= (value & 0x00F000) >> 8;
-                            altImage.setRGB(x, y, rgb);
-                            rgb = 0xFF000000;
-                            rgb |= (value & 0x000F00) << 12;
-                            rgb |= (value & 0x0000F0) << 8;
-                            rgb |= (value & 0x00000F) << 4;
-                            altImage.setRGB(x + 1, y, rgb);
+                            int rgb = 0x0F000000;
+                            rgb |= (value & 0x00F000) << 4;
+                            rgb |= (value & 0x0F0000) >> 8;
+                            rgb |= (value & 0xF00000) >> 20;
+                            altImage.setRGB(x, y, rgb * 0x11);
+                            rgb = 0x0F000000;
+                            rgb |= (value & 0x00000F) << 16;
+                            rgb |= (value & 0x0000F0) << 4;
+                            rgb |= (value & 0x000F00) >> 8;
+                            altImage.setRGB(x + 1, y, rgb * 0x11);
                         }
                     }
                     break;
