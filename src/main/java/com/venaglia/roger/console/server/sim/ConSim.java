@@ -37,8 +37,6 @@ import java.util.function.Consumer;
  */
 public class ConSim extends ConServer {
 
-    private static final long DATA_RATE = 8000000;
-
     private final SimulatedButtons simulatedButtons;
     private final Executor executor;
 

@@ -67,6 +67,8 @@ import java.util.regex.Pattern;
  */
 public abstract class ConServer implements Runnable {
 
+    protected static final int DATA_RATE = 8000000;
+
     private static final Pattern[] MATCH_LCD_SELECTOR = { Pattern.compile("^(0x[0-9a-f][0-9a-f])$") };
     private static final Pattern[] MATCH_LCD_RESET_SELECTOR = { Pattern.compile("^(0x[0-9a-f][0-9a-f]|hard)$") };
     private static final Pattern[] MATCH_LCD_BRIGHTNESS = { Pattern.compile("^(0|[1-9][0-9]{0,2}|1000)$") };

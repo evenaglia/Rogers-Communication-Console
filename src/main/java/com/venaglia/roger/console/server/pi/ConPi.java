@@ -73,8 +73,8 @@ public class ConPi extends ConServer {
 
     public ConPi() throws IOException {
         super();
-        displaySelector = SpiFactory.getInstance(SpiChannel.CS0, SpiDevice.DEFAULT_SPI_SPEED);
-        displayBus = SpiFactory.getInstance(SpiChannel.CS1, SpiDevice.DEFAULT_SPI_SPEED);
+        displaySelector = SpiFactory.getInstance(SpiChannel.CS0, DATA_RATE);
+        displayBus = SpiFactory.getInstance(SpiChannel.CS1, DATA_RATE);
         displaySelector.write((byte)0);
         displayBus.write((byte)0, (byte)0);
 
