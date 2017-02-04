@@ -94,8 +94,8 @@ public abstract class ConServer implements Runnable {
 
     protected static final int PWM_RANGE = 1000;
 //    protected static final ImageSerializer IMAGE_SERIALIZER = new ImageSerializer888();
-    protected static final ImageSerializer IMAGE_SERIALIZER = new ImageSerializer565();
-//    protected static final ImageSerializer IMAGE_SERIALIZER = new ImageSerializer444();
+//    protected static final ImageSerializer IMAGE_SERIALIZER = new ImageSerializer565();
+    protected static final ImageSerializer IMAGE_SERIALIZER = new ImageSerializer444();
 
     private final byte[] secret;
     private final Cache<String,byte[]> imageDataCache;

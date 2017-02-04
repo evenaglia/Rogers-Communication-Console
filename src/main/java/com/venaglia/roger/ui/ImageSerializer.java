@@ -18,14 +18,14 @@
 package com.venaglia.roger.ui;
 
 import com.google.inject.ImplementedBy;
-import com.venaglia.roger.ui.impl.ImageSerializer565;
+import com.venaglia.roger.ui.impl.ImageSerializer444;
 
 import java.awt.image.BufferedImage;
 
 /**
  * Created by ed on 1/26/17.
  */
-@ImplementedBy(ImageSerializer565.class)
+@ImplementedBy(ImageSerializer444.class)
 public interface ImageSerializer {
 
     byte[] serialize(BufferedImage bufferedImage);
